@@ -17,12 +17,14 @@ jobs:
           IMPORT_KIND: app
         run: |
           python - <<'PY'
-          import os, pathlib, zipfile, stat
+          import os, pathlib, zipfile, stat, hashlib
           kind = os.environ["IMPORT_KIND"]
           archive = pathlib.Path("shorts-studio-app-import.zip" if kind == "app" else "shorts-studio-production-import.zip")
           if not archive.is_file():
               raise SystemExit("Upload " + archive.name + " to the repository root first.")
-          static = {"index.html","app.js","styles.css","VERSION.json",".gitignore","requirements-visuals.txt","OPEN-DASHBOARD.cmd","OPEN-PRODUCTION-STUDIO.cmd","CHECK-FOR-UPDATES.cmd","SETUP-UPDATES.cmd",".github/workflows/release-app.yml"}
+          if hashlib.sha256(archive.read_bytes()).hexdigest() != "3dd554b191d3a0accacd59bc0301624675a9a12db90100a54d7d305bb23fa097":
+    raise SystemExit("Archive checksum mismatch. Upload the exact prepared ZIP.")
+static = {"index.html","app.js","styles.css","VERSION.json",".gitignore","requirements-visuals.txt","OPEN-DASHBOARD.cmd","OPEN-PRODUCTION-STUDIO.cmd","CHECK-FOR-UPDATES.cmd","SETUP-UPDATES.cmd",".github/workflows/release-app.yml"}
           private_docs = {"README-PRODUCTION-REPO.md","README-STORYBOARD.md","README-VISUAL-UPGRADE.md","README-PRODUCTION-FLOW.md","README-PREVIEW-AND-SUBTITLES.md","VERSION.json",".gitignore","requirements-visuals.txt"}
           private_scripts = {"batch_render.py","discover_viral.py","quality_check.py","render.py","scout.py","smart_crop.py","storyboard.py","transcribe.py","viral_metrics.py"}
           private_workflows = {"discover-viral.yml","render-batch.yml","render-short.yml","scout-clips.yml","transcribe-short.yml","viral-metrics.yml"}
@@ -54,3 +56,15 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git diff --cached --quiet || git commit -m 'Import Shorts Studio v0.14 source files'
           git push
+      - name: Validate and publish first app release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          node --check app.js
+          python -m compileall -q scripts
+          python scripts/make_app_release.py --out dist/shorts-studio-app.zip
+          if gh release view v0.14.0 >/dev/null 2>&1; then
+            echo 'Release v0.14.0 already exists, skipping.'
+          else
+            gh release create v0.14.0 dist/shorts-studio-app.zip --target "$(git rev-parse HEAD)" --title 'Shorts Studio v0.14.0' --notes 'Initial code-only application release; no private media or user data.'
+          fi
