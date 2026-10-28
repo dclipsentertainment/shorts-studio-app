@@ -1,40 +1,26 @@
 # Shorts Studio — DClips Entertainment
 
-The public application repository for **Shorts Studio**, an AI-assisted YouTube Shorts creation and editing dashboard.
+Public application repository for **Shorts Studio v0.14.0**.
 
-## Project status
+## Status — 28 October 2026
 
-**Repository initialized.** The existing Shorts Studio v0.14 application files have **not yet been imported**. This README describes the planned repository boundary; it is not a claim that the application is deployed.
+- **Imported:** existing v0.14 dashboard, scripts, styles, and documentation.
+- **Verified:** the GitHub importer completed and ran application syntax and packaging checks.
+- **Released:** [v0.14.0](https://github.com/dclipsentertainment/shorts-studio-app/releases/tag/v0.14.0), with the code-only `shorts-studio-app.zip` asset.
+- **Not yet configured:** YouTube API credentials, channel authorisation, and unattended publishing.
 
-The v0.14 application includes work on the dashboard, Viral Radar, Clip Scout, Creative Lab, script drafting, analytics, production flow, previews/subtitles, face tracking, kinetic captions, and storyboard visuals.
+## Download or run
 
-## What belongs here
+Download the ZIP from [Releases](https://github.com/dclipsentertainment/shorts-studio-app/releases) and follow `README-FIRST.md`. Windows launch scripts (`OPEN-DASHBOARD.cmd`, `OPEN-PRODUCTION-STUDIO.cmd`) are included in the app package.
 
-- Application source code and interface assets suitable for public distribution
-- Non-sensitive build and release configuration
-- Public documentation and update/release metadata
+To publish a later update, use **Actions → Publish Shorts Studio app release**, specifying a tag matching `VERSION.json`. Do not reuse existing release tags.
 
-The production workflow and any sensitive operational data belong in the **private** `shorts-studio-production` repository.
+## Repository roles
 
-## Planned release flow
+This public repository holds application code, non-sensitive build configuration and documentation. Production data, sample assets, and rendering workflows belong in the private repository.
 
-1. Import the existing, tested v0.14 project files.
-2. Verify that the application starts and its packaged dependencies work.
-3. Create a versioned GitHub Release with the distributable application.
-4. Connect the application's updater to its published releases and test upgrades.
+Never upload passwords, OAuth credentials, API keys, private footage or user data here.
 
-## Security
+## Import history
 
-Never commit API keys, access tokens, OAuth credentials, private media, customer data, or generated production output. Use GitHub Actions secrets where necessary.
-
-
-## Importing the v0.14 source
-
-1. Download the prepared **shorts-studio-app-import.zip** from the ChatGPT conversation. This is the code-only package, with private production assets excluded.
-2. Open this repository and choose **Add file → Upload files**. Upload that ZIP **without extracting it** and commit it to the root of the `main` branch.
-3. GitHub Actions will run **Import Shorts Studio public app** automatically. You can also choose **Actions → Import Shorts Studio public app → Run workflow** if needed.
-4. The workflow checks the ZIP checksum, imports the code, removes the temporary ZIP from the latest commit, verifies syntax, and attempts to publish the first `v0.14.0` release.
-
-**Do not upload the original combined project ZIP here.** Only upload the prepared public import archive; the original combined ZIP includes production files and media.
-
-The full application has not been uploaded or published until this import workflow finishes successfully.
+The v0.14 source was imported using the checksum-verified `import-app.yml` workflow. The import ZIP was removed from the main branch by the successful workflow. The release workflow was installed separately because the workflow job token cannot create additional workflow files.
