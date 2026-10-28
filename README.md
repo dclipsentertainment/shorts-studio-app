@@ -26,3 +26,15 @@ The production workflow and any sensitive operational data belong in the **priva
 ## Security
 
 Never commit API keys, access tokens, OAuth credentials, private media, customer data, or generated production output. Use GitHub Actions secrets where necessary.
+
+
+## Importing the v0.14 source
+
+1. Download the prepared **shorts-studio-app-import.zip** from the ChatGPT conversation. This is the code-only package, with private production assets excluded.
+2. Open this repository and choose **Add file → Upload files**. Upload that ZIP **without extracting it** and commit it to the root of the `main` branch.
+3. GitHub Actions will run **Import Shorts Studio public app** automatically. You can also choose **Actions → Import Shorts Studio public app → Run workflow** if needed.
+4. The workflow checks the ZIP checksum, imports the code, removes the temporary ZIP from the latest commit, verifies syntax, and attempts to publish the first `v0.14.0` release.
+
+**Do not upload the original combined project ZIP here.** Only upload the prepared public import archive; the original combined ZIP includes production files and media.
+
+The full application has not been uploaded or published until this import workflow finishes successfully.
