@@ -1,0 +1,41 @@
+name: Publish Shorts Studio app release
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release version, e.g. v0.14.0 (must match VERSION.json)'
+        required: true
+        type: string
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate release tag
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          python - <<'PY'
+          import json, os, re
+          tag = os.environ['RELEASE_TAG']
+          version = json.load(open('VERSION.json', encoding='utf-8'))['version']
+          assert re.fullmatch(r'v\d+\.\d+\.\d+',tag), 'Tag must be vMAJOR.MINOR.PATCH'
+          assert tag == 'v' + version, f'Tag {tag} does not match VERSION.json {version}'
+          PY
+      - name: Sanity-check application code
+        run: |
+          node --check app.js
+          python -m compileall -q scripts
+      - name: Package public code only
+        run: python scripts/make_app_release.py --out dist/shorts-studio-app.zip
+      - name: Publish release asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          gh release create "$RELEASE_TAG" dist/shorts-studio-app.zip \
+            --target "$GITHUB_SHA" \
+            --title "Shorts Studio $RELEASE_TAG" \
+            --notes "Code-only app update. Does not contain footage, user data or credentials."
