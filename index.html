@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0a0f1d">
+  <title>Shorts Studio v0.13 · Content command center</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a href="#overview" class="brand" aria-label="Shorts Studio home">
+        <span class="brand-icon">✦</span><span><strong>shorts<span class="brand-light">studio</span></strong><small>CONTENT COMMAND CENTER</small></span>
+      </a>
+      <div class="side-label">WORKSPACE</div>
+      <nav class="nav" aria-label="Main navigation">
+        <button data-nav="overview" class="nav-link active"><span class="nav-symbol">◫</span> Overview</button>
+        <button data-nav="channels" class="nav-link"><span class="nav-symbol">▤</span> Channels <span class="nav-count" id="nav-channel-count">0</span></button>
+        <button data-nav="production" class="nav-link"><span class="nav-symbol">▶</span> Production flow</button>
+        <button data-nav="studio" class="nav-link"><span class="nav-symbol">✧</span> Content studio</button>
+        <button data-nav="preview" class="nav-link"><span class="nav-symbol">▷</span> Preview & subtitles</button>
+        <button data-nav="scout" class="nav-link"><span class="nav-symbol">✂</span> Clip scout</button>
+        <button data-nav="radar" class="nav-link"><span class="nav-symbol">↗</span> Viral radar</button>
+        <button data-nav="discover" class="nav-link"><span class="nav-symbol">⌕</span> Trend discovery</button>
+        <button data-nav="queue" class="nav-link"><span class="nav-symbol">▦</span> Publishing queue</button>
+        <button data-nav="analytics" class="nav-link"><span class="nav-symbol">▥</span> Analytics</button>
+        <button data-nav="growth" class="nav-link"><span class="nav-symbol">↗</span> Growth lab</button>
+        <button data-nav="creative" class="nav-link"><span class="nav-symbol">✎</span> Creative lab</button>
+        <button data-nav="ai" class="nav-link"><span class="nav-symbol">✦</span> ChatGPT script desk</button>
+        <button data-nav="competitors" class="nav-link"><span class="nav-symbol">◉</span> Competitors</button>
+        <button data-nav="quality" class="nav-link"><span class="nav-symbol">✓</span> Quality gate</button>
+      </nav>
+      <div class="side-label">SYSTEM</div>
+      <nav class="nav"><button data-nav="setup" class="nav-link"><span class="nav-symbol">⚙</span> Setup & backups</button></nav>
+      <div class="sidebar-bottom">
+        <div class="online-indicator"><span class="led"></span> Local workspace <span class="free-label">FREE</span></div>
+        <p>v0.13.0 · Your data stays in this browser. Export backups regularly.</p>
+      </div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="topbar-left"><button class="mobile-menu" id="mobile-menu" aria-label="Open menu">☰</button><span class="crumb">WORKSPACE</span><span class="slash">/</span><span id="crumb-current">Overview</span></div>
+        <div class="top-actions"><span class="date-pill" id="today-date"></span><button class="button button-primary small" data-action="new-content">＋ New content</button></div>
+      </header>
+      <main id="main" tabindex="-1"></main>
+    </div>
+  </div>
+  <dialog id="modal" class="modal" aria-label="Editor"><div id="modal-body"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js" defer></script>
+</body>
+</html>
