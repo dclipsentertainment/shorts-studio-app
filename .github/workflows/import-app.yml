@@ -3,6 +3,7 @@ on:
   push:
     paths:
       - shorts-studio-app-import.zip
+      - .github/workflows/import-app.yml
   workflow_dispatch:
 permissions:
   contents: write
@@ -43,6 +44,8 @@ jobs:
                   if not allowed(n) or n.startswith("/") or "\\" in n or ".." in pathlib.PurePosixPath(n).parts or stat.S_ISLNK(item.external_attr >> 16):
                       raise SystemExit("Rejected package entry: " + n)
               for item in infos:
+                  if item.filename.startswith(".github/workflows/"):
+                      continue  # Existing workflow files are installed separately with authorized GitHub access.
                   path = pathlib.Path(item.filename)
                   path.parent.mkdir(parents=True, exist_ok=True)
                   path.write_bytes(z.read(item))
