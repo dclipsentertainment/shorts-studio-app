@@ -1,0 +1,56 @@
+name: Import Shorts Studio public app
+on:
+  push:
+    paths:
+      - shorts-studio-app-import.zip
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify and extract source package
+        env:
+          IMPORT_KIND: app
+        run: |
+          python - <<'PY'
+          import os, pathlib, zipfile, stat
+          kind = os.environ["IMPORT_KIND"]
+          archive = pathlib.Path("shorts-studio-app-import.zip" if kind == "app" else "shorts-studio-production-import.zip")
+          if not archive.is_file():
+              raise SystemExit("Upload " + archive.name + " to the repository root first.")
+          static = {"index.html","app.js","styles.css","VERSION.json",".gitignore","requirements-visuals.txt","OPEN-DASHBOARD.cmd","OPEN-PRODUCTION-STUDIO.cmd","CHECK-FOR-UPDATES.cmd","SETUP-UPDATES.cmd",".github/workflows/release-app.yml"}
+          private_docs = {"README-PRODUCTION-REPO.md","README-STORYBOARD.md","README-VISUAL-UPGRADE.md","README-PRODUCTION-FLOW.md","README-PREVIEW-AND-SUBTITLES.md","VERSION.json",".gitignore","requirements-visuals.txt"}
+          private_scripts = {"batch_render.py","discover_viral.py","quality_check.py","render.py","scout.py","smart_crop.py","storyboard.py","transcribe.py","viral_metrics.py"}
+          private_workflows = {"discover-viral.yml","render-batch.yml","render-short.yml","scout-clips.yml","transcribe-short.yml","viral-metrics.yml"}
+          def allowed(n):
+              if kind == "app":
+                  return n in static or (n.startswith("README-") and n.endswith(".md") and n != "README-PRODUCTION-REPO.md") or (n.startswith("scripts/") and n.count("/") == 1 and n.endswith((".py",".ps1")))
+              return (n in private_docs or (n.startswith("scripts/") and n.count("/") == 1 and n.split("/")[-1] in private_scripts) or (n.startswith(".github/workflows/") and n.count("/") == 2 and n.split("/")[-1] in private_workflows) or (n.startswith("jobs/") and n.count("/") == 1 and n.endswith(".json")) or (n.startswith("reports/") and n.count("/") == 1 and n.endswith((".json",".csv",".srt"))) or (n.startswith("assets/") and n.count("/") == 1 and n.endswith((".mp4",".png",".jpg",".jpeg",".webm",".m4a"))))
+          required = ({"index.html","app.js","VERSION.json",".github/workflows/release-app.yml","scripts/make_app_release.py"} if kind == "app" else {"scripts/render.py","scripts/batch_render.py",".github/workflows/render-short.yml","jobs/example-storyboard.json"})
+          with zipfile.ZipFile(archive) as z:
+              infos = [i for i in z.infolist() if not i.is_dir()]
+              names = [i.filename for i in infos]
+              if len(names) > 90 or len(set(names)) != len(names) or not required.issubset(names) or sum(i.file_size for i in infos) > 30_000_000:
+                  raise SystemExit("Unexpected source package contents.")
+              for item in infos:
+                  n = item.filename
+                  if not allowed(n) or n.startswith("/") or "\\" in n or ".." in pathlib.PurePosixPath(n).parts or stat.S_ISLNK(item.external_attr >> 16):
+                      raise SystemExit("Rejected package entry: " + n)
+              for item in infos:
+                  path = pathlib.Path(item.filename)
+                  path.parent.mkdir(parents=True, exist_ok=True)
+                  path.write_bytes(z.read(item))
+          print("Imported",len(infos),"verified",kind,"files.")
+          PY
+      - name: Commit sources and remove temporary ZIP
+        run: |
+          rm -f -- shorts-studio-app-import.zip
+          git add -A
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git diff --cached --quiet || git commit -m 'Import Shorts Studio v0.14 source files'
+          git push
