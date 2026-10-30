@@ -65,7 +65,7 @@ const context={document,window:w,location:{hash:'#quick',protocol:'file:',hostna
  navigator:{clipboard:{writeText(){return Promise.resolve()}}},confirm:()=>true,
  console,setTimeout(){return 1},clearTimeout(){},Date,Math,Number,JSON,Intl,URL,Blob,Array,Map,Set,String,Object,Boolean,RegExp,
  performance:{now(){return 0}}};
-const instrument=app.replace(/}\)\(\);\s*$/, 'window.__testQuick={quickPrepare,quickReview,quickCreate,getState(){return state;}};})();');
+const instrument=app.replace(/}\)\(\);\s*$/, 'window.__testQuick={quickPrepare,quickReview,quickCreate,quickPasteReview,quickImportFile,goQuick(){page="quick";render();},getState(){return state;}};})();');
 assert.notEqual(instrument,app);
 vm.runInNewContext(instrument,context,{timeout:6000});
 assert(elements.main.innerHTML.includes('ONLY THE TITLE IS REQUIRED'));
@@ -83,4 +83,19 @@ assert.equal(st.seriesPlans.length,1);
 assert(st.projects.every(x=>x.status==='draft'&&!x.rights&&x.aiReview?.confirmed===false));
 assert(st.projects.every(x=>x.visualMode==='illustrated'&&x.visualScenes.length>=2&&x.visualScenes.every(s=>!s.image_path)));
 assert(st.projects.every(x=>x.series?.total>=1&&x.voiceMode==='kokoro'));
-console.log('PASS: Title + optional description -> manual ChatGPT handoff -> safe automatic multi-platform draft review; no images or video falsely claimed.');
+
+w.__testQuick.goQuick();
+inputs['quick-title']={value:'The Lost Lighthouse'};
+inputs['quick-description']={value:'A mysterious beacon and a family secret'};
+w.__testQuick.quickPrepare();
+assert(elements.main.innerHTML.includes('quick-paste-review'),'One-click clipboard import should be visible');
+assert(elements.main.innerHTML.includes('quick-story-file'),'ChatGPT JSON file selection should be visible');
+context.navigator.clipboard.readText=async()=>response;
+w.__testQuick.quickPasteReview().then(async()=>{
+ assert(elements.main.innerHTML.includes('Automatic platform recommendations'),'Clipboard import should show the story review');
+ w.__testQuick.quickPrepare();
+ await w.__testQuick.quickImportFile({name:'dclips-story.json',size:response.length,text:async()=>response});
+ assert(elements.main.innerHTML.includes('Automatic platform recommendations'),'Single-file JSON import should show the story review');
+ console.log('PASS: Title + optional description, one-click clipboard or JSON file import, human-review-ready drafts; no media falsely claimed.');
+}).catch(err=>{console.error(err);process.exitCode=1;});
+

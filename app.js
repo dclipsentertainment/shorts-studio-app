@@ -142,11 +142,11 @@ function quickPage(){
  <div class="preview-actions" style="margin-top:14px"><button type="button" class="button button-primary" data-action="quick-prepare">✦ Prepare my story with ChatGPT</button></div>
  <p class="footnote">No script, episode counts, scene timings, narrator or platform choices to fill in. ChatGPT creates the story package; DClips calculates the video plan automatically. Your ChatGPT account still requires a brief copy/paste handoff because it cannot be called directly from this free website.</p></section>
  ${quickPrompt?`<section class="panel" style="margin-bottom:20px"><div class="panel-head"><h2>2 · Get your complete story from ChatGPT</h2><span class="tiny-muted">NO EXTRA IMAGE API CHARGES</span></div>
- <p class="secondary-note">Copy this prepared request and open ChatGPT. Ask it to return one JSON story package. Then paste the entire response below. You do not have to write the script or plan scenes yourself.</p>
+ <p class="secondary-note">DClips has already written the request. When you return from ChatGPT, use <strong>Import from clipboard</strong> or select the ChatGPT JSON file. Pasting still works if your browser blocks clipboard access.</p>
  <div class="form-field"><label for="quick-prompt">Your automatically prepared request</label><textarea id="quick-prompt" class="field ai-code" rows="7" spellcheck="false" readonly>${esc(quickPrompt)}</textarea></div>
  <div class="split-buttons" style="margin-top:12px"><button type="button" class="button button-primary" data-action="quick-copy">Copy ChatGPT request</button><a href="https://chatgpt.com/" class="button button-ghost" target="_blank" rel="noopener noreferrer">Open ChatGPT ↗</a></div>
  <div class="form-field" style="margin-top:20px"><label for="quick-json">Paste completed story package</label><textarea id="quick-json" class="field ai-code" rows="7" spellcheck="false" placeholder="Paste the JSON from ChatGPT here, then click Review story.">${esc(quickJson)}</textarea></div>
- <button type="button" class="button button-primary" data-action="quick-review" style="margin-top:12px">✓ Review generated story</button>
+ <div class="split-buttons" style="margin-top:12px"><button type="button" class="button button-primary" data-action="quick-paste-review">↳ Import from clipboard &amp; review</button><label class="button button-ghost" for="quick-story-file" style="cursor:pointer">⇧ Choose JSON file</label><input type="file" id="quick-story-file" accept=".json,application/json,text/plain,.txt" hidden><button type="button" class="button" data-action="quick-review">Review pasted story</button></div>
  </section>`:''}
  ${quickPack&&plan?`<section class="panel" style="margin-bottom:20px"><div class="panel-head"><h2>3 · Review your generated story</h2><span class="tiny-muted">NOT APPROVED OR PUBLISHED</span></div>
  <div class="notice"><strong>${esc(quickPack.title)}</strong> · ${quickPack.words} words · ~${Math.round(quickPack.estimatedSeconds/60*10)/10} min · ${esc(quickPack.type)}. All information, images and audio require human review before final publishing.</div>
@@ -190,6 +190,24 @@ function quickReview(){
   if(count>80)throw Error('This story would create too many drafts. Ask ChatGPT to shorten the story.');
   render();notice('Story and scene plan ready for review. Nothing has been published or billed.');
  }catch(e){quickPack=null;notice('Story response needs correction: '+e.message);}
+}
+async function quickPasteReview(){
+ try{
+  if(!navigator.clipboard?.readText)throw Error('Clipboard access is not supported by this browser. Use the JSON file or paste into the text box.');
+  const text=await navigator.clipboard.readText();
+  if(!text||text.length>115000)throw Error('Copy the complete ChatGPT JSON story first.');
+  const field=$('#quick-json');if(field)field.value=text;
+  quickReview();
+ }catch(e){notice('Could not import clipboard: '+e.message)}
+}
+async function quickImportFile(file){
+ if(!file)return;
+ try{
+  if(file.size<10||file.size>115000||!/\.(json|txt)$/i.test(file.name))throw Error('Choose a ChatGPT JSON file smaller than 115 KB.');
+  const text=await file.text();
+  const field=$('#quick-json');if(!field)throw Error('Open Quick Create to import this story.');
+  field.value=text;quickReview();
+ }catch(e){notice('Cannot import ChatGPT file: '+e.message)}
 }
 function quickCreate(){
  try{
@@ -1244,20 +1262,25 @@ function cloudVideoPanel(current){
  const item=cloudFinishedPreviews.get(current.id);
  return `<section class="panel" style="margin-top:16px">
  <div class="panel-head"><h2>Review the finished cloud video</h2><span class="tiny-muted">AFTER GITHUB ACTIONS</span></div>
- <p class="secondary-note">Download the finished MP4 from your private GitHub Actions run. Select it here to watch on this page, then revise parts or scene timings. The MP4 stays in your browser and is never uploaded to our public site. This review is not a technical quality approval.</p>
- <input type="file" id="cloud-finished-mp4" accept="video/mp4,.mp4" aria-label="Select finished online rendered MP4">
+ <p class="secondary-note">Download the <strong>finished-online-video</strong> ZIP from your private GitHub Actions run and select the ZIP here — no extraction needed. You can also select the MP4 directly. Watch it before revising parts or scene timings. The MP4 stays in your browser and is never uploaded to our public site. This review is not a technical quality approval.</p>
+ <input type="file" id="cloud-finished-mp4" accept="video/mp4,.mp4,.zip,application/zip" aria-label="Select finished online rendered MP4">
  ${item?`<video controls playsinline id="cloud-preview-player" src="${esc(item.url)}" style="width:100%;max-height:450px;margin-top:14px"></video>
  <p class="tiny-muted">${esc(item.name)} · watch to the end to unlock revised episode controls.</p>`:'<p class="tiny-muted">No cloud-rendered MP4 selected yet.</p>'}
  </section>`;
 }
-function cloudReceiveVideo(file){
+async function cloudReceiveVideo(file){
  const p=productionProject();if(!p||!file)return;
- if(!/\.mp4$/i.test(file.name)||file.size<1000||file.size>500*1024*1024){notice('Choose a finished MP4 under 500 MiB.');return}
- const previous=cloudFinishedPreviews.get(p.id);
- if(previous)URL.revokeObjectURL(previous.url);
- cloudFinishedPreviews.set(p.id,{url:URL.createObjectURL(file),name:file.name,fingerprint:renderFingerprint(p)});
- watchedSeriesRenderKey='';
- render();notice('Finished cloud video loaded locally. Watch it from beginning to end before revising.');
+ try{
+  const originalName=file.name;
+  if(/\.zip$/i.test(file.name))file=await window.DClipsCloudPack.videoFromArtifactZip(file);
+  if(!/\.mp4$/i.test(file.name)||file.size<1000||file.size>500*1024*1024)
+   throw Error('Choose a finished MP4 or GitHub artifact ZIP within the size limits.');
+  const previous=cloudFinishedPreviews.get(p.id);
+  if(previous)URL.revokeObjectURL(previous.url);
+  cloudFinishedPreviews.set(p.id,{url:URL.createObjectURL(file),name:originalName,fingerprint:renderFingerprint(p)});
+  watchedSeriesRenderKey='';
+  render();notice('Finished online video ready for review. Watch it through to the end before revising.');
+ }catch(e){notice('Could not open GitHub video artifact: '+e.message)}
 }
 
 function cloudEpisodeImagePrompt(project){
@@ -1271,7 +1294,7 @@ function cloudEpisodeImagePrompt(project){
   'Use consistent character appearance, period details and artwork style; no text, captions, logos or watermarks. Vertical 9:16 layout with the lower third clear for subtitles.',
   ...project.visualScenes.map((scene,i)=>String(i+1).padStart(2,'0')+(i===0?'-cover':'-scene')+
      ': '+scene.headline+'. '+(i===0?'Opening establishing image; do not draw title text.':'Illustration of this specific moment in the narration.')),
-  'I will save each image with the numbered filename above to match DClips automatically. Produce original art only; do not claim historical reconstructions are real photos.'
+  'Generate the numbered pictures separately. If you can, package them into a single dclips-images.zip with only these image files; otherwise give me the separate pictures. Use those exact filenames. Produce original art only; do not claim historical reconstructions are real photos.'
  ].join('\n');
 }
 function cloudCopyEpisode(){
@@ -1286,12 +1309,12 @@ function cloudImagePanel(current){
  const set=cloudImagePacks.get(current.id),scenes=current.visualScenes||[];
  return `<section class="panel" style="margin-top:14px" aria-label="Free online video rendering">
  <div class="panel-head"><h2>ChatGPT image pack → online video</h2><span class="tiny-muted">NO PC RENDERING</span></div>
- <p class="secondary-note">Save your ChatGPT illustrations, then select all the images for THIS episode together. Files named 01-cover, 02-scene, 03-scene, etc. are matched automatically. Otherwise they're matched alphabetically. Images stay in this browser until you download a private render ZIP.</p>
+ <p class="secondary-note">Save your ChatGPT illustrations as <strong>one ZIP</strong> (when ChatGPT offers one), or as separate pictures. Select the ZIP or all images in one go. Filenames such as 01-cover, 02-scene and 03-scene match automatically; other images sort alphabetically. Pictures stay in your browser until you download your private render pack.</p>
  <div class="split-buttons" style="margin-bottom:12px"><button class="button button-ghost" type="button" data-action="cloud-copy-prompt">Copy ChatGPT image request for this episode</button><a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" class="button button-ghost">Open ChatGPT ↗</a></div>
- <div class="production-upload"><input id="production-cloud-images" type="file" accept="image/png,image/jpeg,image/webp" multiple aria-label="Choose all illustrated scene images"><button type="button" class="button button-ghost" data-action="cloud-clear">Clear selected pictures</button></div>
+ <div class="production-upload"><input id="production-cloud-images" type="file" accept="image/png,image/jpeg,image/webp,.zip,application/zip" multiple aria-label="Choose an image ZIP or select all illustrated scene images"><button type="button" class="button button-ghost" data-action="cloud-clear">Clear selected pictures</button></div>
  <div id="cloud-scene-list">${cloudImageList(current)}</div>
  <p class="footnote">Images are not sent to our site. GitHub Actions will render using the ZIP you explicitly upload to your <strong>private</strong> production repository. Free GitHub Actions minutes have limits.</p>
- <button class="button button-primary" type="button" data-action="cloud-export">⇩ Download online-render pack</button>
+ <button class="button button-primary" type="button" data-action="cloud-export">⇩ Download pack &amp; open GitHub upload</button>
  <div class="secondary-note" style="margin-top:12px">Then <a target="_blank" rel="noopener noreferrer" href="https://github.com/dclipsentertainment/shorts-studio-production/upload/main">upload the ZIP to your private GitHub repository</a> using <strong>Add file → Upload files</strong>. Commit the file. GitHub Actions automatically renders the MP4. Open <a target="_blank" rel="noopener noreferrer" href="https://github.com/dclipsentertainment/shorts-studio-production/actions">GitHub Actions</a> → <strong>Render uploaded DClips video</strong> → latest completed run → <strong>finished-online-video</strong> to get your MP4.</div>
  </section>`;
 }
@@ -1320,15 +1343,21 @@ async function cloudImagesSelected(files){
  const p=productionProject();if(!p)return;
  try{
   productionDraftSave();
-  const input=Array.from(files||[]);
+  let input=Array.from(files||[]);
   if(!input.length)return;
+  if(input.some(f=>/\.zip$/i.test(f.name))){
+   if(input.length!==1||!/\.zip$/i.test(input[0].name))
+    throw Error('Select one image ZIP by itself, or select separate image files.');
+   const archive=input[0];
+   input=await window.DClipsCloudPack.imagesFromArchive(archive);
+  }
   const result=window.DClipsCloudPack.assign(input,p.visualScenes.length);
   const old=cloudImagePacks.get(p.id);
   if(old)for(const url of old.urls.values())URL.revokeObjectURL(url);
   const urls=new Map(input.map(file=>[file,URL.createObjectURL(file)]));
   cloudImagePacks.set(p.id,{files:input,slots:result.slots,urls});
   cloudPaint();
-  notice('Assigned '+result.slots.filter(Boolean).length+' images automatically. Review the matching pictures below.');
+  notice('Ready: '+result.slots.filter(Boolean).length+' pictures matched to scenes. Review them, then download the cloud render pack.');
  }catch(e){notice('Cannot import images: '+e.message)}
 }
 function cloudSwitchScene(index,selected){
@@ -1361,12 +1390,15 @@ async function cloudExport(){
   if(blockers.length)throw Error(blockers[0]);
   const job=createRenderJob(projected);
   if(!confirm('Create a private online render ZIP containing the complete narration and '+files.length+' illustrations? You will upload it to your PRIVATE GitHub repo manually. It is not published to social media.'))return;
+  // Start the trusted GitHub upload page only from this confirmed click.
+  // Browser security still requires the user to choose and commit the ZIP there.
+  if(typeof window.open==='function')window.open('https://github.com/dclipsentertainment/shorts-studio-production/upload/main','_blank','noopener,noreferrer');
   productionBusy=true;const bytes=await window.DClipsCloudPack.packageJob(job,files);
   const name='cloud-render-'+new Date().toISOString().replace(/[-:TZ.]/g,'').slice(0,14)+'-'+Math.random().toString(36).slice(2,8)+'.zip';
   const objectUrl=URL.createObjectURL(new Blob([bytes],{type:'application/zip'}));
   const a=document.createElement('a');a.href=objectUrl;a.download=name;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(objectUrl),10000);
-  notice('Private render ZIP downloaded. Upload it to your private GitHub production repo to start the cloud render.');
+  notice('ZIP downloaded. The private GitHub upload page is opening; choose the ZIP there and commit it to start rendering.');
  }catch(e){notice('Online render pack not ready: '+e.message)}finally{productionBusy=false;}
 }
 
@@ -1852,7 +1884,7 @@ function productionRebalanceSeries(){
  }catch(e){notice(e.message);}
 }
 function handleClick(ev){let nav=ev.target.closest('[data-nav]');if(nav){navigate(nav.dataset.nav);return}let btn=ev.target.closest('[data-action]');if(!btn)return;let action=btn.dataset.action,id=btn.dataset.id;
- switch(action){case 'cloud-copy-prompt':cloudCopyEpisode();break;case 'cloud-export':cloudExport();break;case 'cloud-clear':cloudClear();break;case 'quick-open':navigate('quick');break;case 'quick-prepare':quickPrepare();break;case 'quick-copy':if(quickPrompt)copyText(quickPrompt);break;case 'quick-copy-images':if(quickPack)copyText(window.DClipsQuick.imagePrompt(quickPack));break;case 'quick-review':quickReview();break;case 'quick-create':quickCreate();break;case 'production-series-rebalance':productionRebalanceSeries();break;case 'series-preview':seriesPreviewAction();break;case 'series-create':seriesCreate();break;case 'series-example':seriesExample();break;case 'series-show-drafts':seriesShowDrafts(id);break;case 'production-approve':productionApprove();break;case 'live-plan':livePlan(id);break;case 'live-delete':state.streamers=(state.streamers||[]).filter(w=>w.id!==id);save();render();notice('Streamer removed.');break;case 'production-remove-commentary':productionRemoveCommentary();break;case 'production-apply-text':productionApplyText();break;case 'production-center-text':moveTextInput('production',true);break;case 'production-play':productionPlayStoryboard();break;case 'production-stop':productionStopStoryboard();break;case 'production-save':productionSave();break;case 'production-estimate':productionEstimate();break;case 'production-upload-video':productionUpload('file');break;case 'production-upload-audio':productionUpload('audio');break;case 'production-demo':productionDemo();break;case 'production-auto-scenes':productionAutoScenes();break;case 'production-create-art':productionGenerateSceneImages();break;case 'production-upload-scene':productionUploadScene();break;case 'production-generated':productionGenerated();break;case 'production-transcribe':productionTranscribe();break;case 'production-import-cues':$('#production-cue-file')?.click();break;case 'production-add-cue':{const t=productionCues.at(-1)?.end_seconds||0;const len=Number($('#production-length')?.value)||30;if(t<len-.1){productionCues.push({start_seconds:t,end_seconds:Math.min(t+1.5,len),text:'New caption'});productionPaint()}break;}case 'production-remove-cue':productionCues.splice(Number(btn.dataset.index),1);productionPaint();break;case 'production-seek':{const vid=$('#production-video');const cue=productionCues[Number(btn.dataset.index)];if(vid&&cue)vid.currentTime=(Number($('#production-start')?.value)||0)+cue.start_seconds;break;}case 'production-render':productionRender();break;case 'production-export':productionExport();break;case 'new-channel':openChannel();break;case 'edit-channel':openChannel(id);break;case 'new-content':openProject(null,{channelId:btn.dataset.channel,kind:btn.dataset.kind});break;case 'edit-content':openProject(id);break;case 'preview-project':previewSelectProject(id);navigate('preview');break;case 'preview-demo':previewDemo();break;case 'preview-add':previewAddCue();break;case 'preview-seek-start':{let v=$('#preview-video');if(v&&v.readyState)v.currentTime=previewStart();break;}case 'preview-jump':{let v=$('#preview-video'),c=previewSegments[Number(btn.dataset.index)];if(v?.readyState&&c)v.currentTime=previewStart()+c.start_seconds;break;}case 'preview-remove':previewSegments.splice(Number(btn.dataset.index),1);previewPaintCues();break;case 'preview-apply-text':previewApplyText();break;case 'preview-center-text':moveTextInput('preview',true);break;case 'preview-remove-voice':previewRemoveCommentary();break;case 'preview-save':previewSave();break;case 'preview-export-srt':previewExportSRT();break;case 'preview-export-json':previewExportJSON();break;case 'preview-export-job':{if(previewProject())jobExport(previewProjectId);break;}case 'close-modal':$('#modal').close();break;case 'go-studio':navigate('studio');break;case 'export-job':jobExport(id);break;case 'export-batch':exportRenderBatch();break;case 'restore-recovery':restoreRecovery(Number(btn.dataset.index));break;case 'backup':downloadJSON(`shorts-studio-backup-${new Date().toISOString().slice(0,10)}.json`,state);notice('Backup downloaded.');break;case 'import':$('#import-file').click();break;case 'import-scout':$('#scout-file').click();break;case 'import-trends':$('#trend-file').click();break;case 'import-discovery':$('#discovery-file').click();break;case 'export-discovery':if(state.discovery)downloadJSON('youtube-discovery-ranked.json',state.discovery);break;case 'track-discovery':trackDiscovery(id);break;case 'idea-discovery':trackDiscovery(id,true);break;case 'new-trend':openTrend();break;case 'edit-trend':openTrend(id);break;case 'delete-trend':deleteTrend(id);break;case 'idea-trend':ideaTrend(id);break;case 'export-trends':exportTrends();break;case 'export-growth':exportGrowth();break;case 'add-candidate':addCandidate(id,Number(btn.dataset.index));break;case 'demo':doDemo();break;case 'reset':if(confirm('Delete all channels, projects, trend watchlists and manual stats in this browser? This cannot be undone.')){state=initial();save();render();notice('Local workspace reset.')}break;case 'delete-channel':if(confirm('Delete this channel and all its projects?')){state.channels=state.channels.filter(x=>x.id!==id);state.projects=state.projects.filter(x=>x.channelId!==id);$('#modal').close();save();render()}break;case 'delete-project':if(confirm('Delete this project?')){state.projects=state.projects.filter(x=>x.id!==id);$('#modal').close();save();render()}break;case 'script-starter':suggestScript();break;case 'generate-concept':generateConcept();break;case 'ai-load-project':loadAiProject();break;case 'ai-existing':{if($('#modal').open)$('#modal').close();let p=state.projects.find(x=>x.id===id);aiPrefill=p?{topic:p.title,angle:(p.notes||'').slice(0,600),mode:p.kind,channelId:p.channelId,projectId:p.id}:null;navigate('ai');break;}case 'ai-build-prompt':buildAiPrompt();break;case 'ai-copy-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)copyText(t);break;}case 'ai-download-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)downloadText('chatgpt-shorts-prompt.txt',t);break;}case 'ai-preview':previewAiReply();break;case 'ai-save-draft':saveAiDraft();break;case 'ai-import-file':$('#ai-file').click();break;case 'save-concept':saveConcept(Number(btn.dataset.index));break;case 'copy-caption':{let p=state.projects.find(x=>x.id===id);if(p)copyText([p.ytTitle||p.title,p.description].filter(Boolean).join('\n\n'));break;}}
+ switch(action){case 'cloud-copy-prompt':cloudCopyEpisode();break;case 'cloud-export':cloudExport();break;case 'cloud-clear':cloudClear();break;case 'quick-open':navigate('quick');break;case 'quick-prepare':quickPrepare();break;case 'quick-copy':if(quickPrompt)copyText(quickPrompt);break;case 'quick-copy-images':if(quickPack)copyText(window.DClipsQuick.imagePrompt(quickPack));break;case 'quick-review':quickReview();break;case 'quick-paste-review':quickPasteReview();break;case 'quick-create':quickCreate();break;case 'production-series-rebalance':productionRebalanceSeries();break;case 'series-preview':seriesPreviewAction();break;case 'series-create':seriesCreate();break;case 'series-example':seriesExample();break;case 'series-show-drafts':seriesShowDrafts(id);break;case 'production-approve':productionApprove();break;case 'live-plan':livePlan(id);break;case 'live-delete':state.streamers=(state.streamers||[]).filter(w=>w.id!==id);save();render();notice('Streamer removed.');break;case 'production-remove-commentary':productionRemoveCommentary();break;case 'production-apply-text':productionApplyText();break;case 'production-center-text':moveTextInput('production',true);break;case 'production-play':productionPlayStoryboard();break;case 'production-stop':productionStopStoryboard();break;case 'production-save':productionSave();break;case 'production-estimate':productionEstimate();break;case 'production-upload-video':productionUpload('file');break;case 'production-upload-audio':productionUpload('audio');break;case 'production-demo':productionDemo();break;case 'production-auto-scenes':productionAutoScenes();break;case 'production-create-art':productionGenerateSceneImages();break;case 'production-upload-scene':productionUploadScene();break;case 'production-generated':productionGenerated();break;case 'production-transcribe':productionTranscribe();break;case 'production-import-cues':$('#production-cue-file')?.click();break;case 'production-add-cue':{const t=productionCues.at(-1)?.end_seconds||0;const len=Number($('#production-length')?.value)||30;if(t<len-.1){productionCues.push({start_seconds:t,end_seconds:Math.min(t+1.5,len),text:'New caption'});productionPaint()}break;}case 'production-remove-cue':productionCues.splice(Number(btn.dataset.index),1);productionPaint();break;case 'production-seek':{const vid=$('#production-video');const cue=productionCues[Number(btn.dataset.index)];if(vid&&cue)vid.currentTime=(Number($('#production-start')?.value)||0)+cue.start_seconds;break;}case 'production-render':productionRender();break;case 'production-export':productionExport();break;case 'new-channel':openChannel();break;case 'edit-channel':openChannel(id);break;case 'new-content':openProject(null,{channelId:btn.dataset.channel,kind:btn.dataset.kind});break;case 'edit-content':openProject(id);break;case 'preview-project':previewSelectProject(id);navigate('preview');break;case 'preview-demo':previewDemo();break;case 'preview-add':previewAddCue();break;case 'preview-seek-start':{let v=$('#preview-video');if(v&&v.readyState)v.currentTime=previewStart();break;}case 'preview-jump':{let v=$('#preview-video'),c=previewSegments[Number(btn.dataset.index)];if(v?.readyState&&c)v.currentTime=previewStart()+c.start_seconds;break;}case 'preview-remove':previewSegments.splice(Number(btn.dataset.index),1);previewPaintCues();break;case 'preview-apply-text':previewApplyText();break;case 'preview-center-text':moveTextInput('preview',true);break;case 'preview-remove-voice':previewRemoveCommentary();break;case 'preview-save':previewSave();break;case 'preview-export-srt':previewExportSRT();break;case 'preview-export-json':previewExportJSON();break;case 'preview-export-job':{if(previewProject())jobExport(previewProjectId);break;}case 'close-modal':$('#modal').close();break;case 'go-studio':navigate('studio');break;case 'export-job':jobExport(id);break;case 'export-batch':exportRenderBatch();break;case 'restore-recovery':restoreRecovery(Number(btn.dataset.index));break;case 'backup':downloadJSON(`shorts-studio-backup-${new Date().toISOString().slice(0,10)}.json`,state);notice('Backup downloaded.');break;case 'import':$('#import-file').click();break;case 'import-scout':$('#scout-file').click();break;case 'import-trends':$('#trend-file').click();break;case 'import-discovery':$('#discovery-file').click();break;case 'export-discovery':if(state.discovery)downloadJSON('youtube-discovery-ranked.json',state.discovery);break;case 'track-discovery':trackDiscovery(id);break;case 'idea-discovery':trackDiscovery(id,true);break;case 'new-trend':openTrend();break;case 'edit-trend':openTrend(id);break;case 'delete-trend':deleteTrend(id);break;case 'idea-trend':ideaTrend(id);break;case 'export-trends':exportTrends();break;case 'export-growth':exportGrowth();break;case 'add-candidate':addCandidate(id,Number(btn.dataset.index));break;case 'demo':doDemo();break;case 'reset':if(confirm('Delete all channels, projects, trend watchlists and manual stats in this browser? This cannot be undone.')){state=initial();save();render();notice('Local workspace reset.')}break;case 'delete-channel':if(confirm('Delete this channel and all its projects?')){state.channels=state.channels.filter(x=>x.id!==id);state.projects=state.projects.filter(x=>x.channelId!==id);$('#modal').close();save();render()}break;case 'delete-project':if(confirm('Delete this project?')){state.projects=state.projects.filter(x=>x.id!==id);$('#modal').close();save();render()}break;case 'script-starter':suggestScript();break;case 'generate-concept':generateConcept();break;case 'ai-load-project':loadAiProject();break;case 'ai-existing':{if($('#modal').open)$('#modal').close();let p=state.projects.find(x=>x.id===id);aiPrefill=p?{topic:p.title,angle:(p.notes||'').slice(0,600),mode:p.kind,channelId:p.channelId,projectId:p.id}:null;navigate('ai');break;}case 'ai-build-prompt':buildAiPrompt();break;case 'ai-copy-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)copyText(t);break;}case 'ai-download-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)downloadText('chatgpt-shorts-prompt.txt',t);break;}case 'ai-preview':previewAiReply();break;case 'ai-save-draft':saveAiDraft();break;case 'ai-import-file':$('#ai-file').click();break;case 'save-concept':saveConcept(Number(btn.dataset.index));break;case 'copy-caption':{let p=state.projects.find(x=>x.id===id);if(p)copyText([p.ytTitle||p.title,p.description].filter(Boolean).join('\n\n'));break;}}
 }
 // Drag caption text directly on the video. Save coordinates with each project's final render job.
 document.addEventListener('pointerdown',ev=>{
@@ -1900,7 +1932,8 @@ document.addEventListener('input',ev=>{
  if(ev.target.id==='studio-search')applyStudioFilters();
  if(['preview-caption-x','preview-caption-y'].includes(ev.target.id))moveTextInput('preview');
  if(['production-caption-x','production-caption-y'].includes(ev.target.id))moveTextInput('production');if(ev.target.dataset.productionCue){const cue=productionCues[Number(ev.target.dataset.index)];if(cue){const field=ev.target.dataset.productionCue;cue[field]=field==='text'?ev.target.value:Number(ev.target.value);productionUpdateOverlay();}}if(ev.target.dataset.cueField){let s=previewSegments[Number(ev.target.dataset.index)];if(s){let v=ev.target.dataset.cueField;s[v]=v==='text'?ev.target.value:Number(ev.target.value);previewUpdateOverlay();}}});
-document.addEventListener('change',ev=>{if(ev.target.id==='production-cloud-images')cloudImagesSelected(ev.target.files);
+document.addEventListener('change',ev=>{if(ev.target.id==='quick-story-file'){quickImportFile(ev.target.files?.[0]);ev.target.value='';}
+ if(ev.target.id==='production-cloud-images')cloudImagesSelected(ev.target.files);
  if(ev.target.id==='cloud-finished-mp4')cloudReceiveVideo(ev.target.files?.[0]);
  if(ev.target.dataset.cloudSlot!==undefined)cloudSwitchScene(Number(ev.target.dataset.cloudSlot),ev.target.value);
  if(['studio-channel','studio-status','studio-sort'].includes(ev.target.id))applyStudioFilters();if(ev.target.id==='production-caption-style'){const pos=$('#production-caption-y');if(pos){const p=productionProject();if(!p||!Number.isFinite(Number(p.captionY)))pos.value=ev.target.value==='hook'?19:75;}productionUpdateOverlay();}

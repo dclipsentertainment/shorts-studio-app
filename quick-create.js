@@ -86,7 +86,7 @@
    'For every image: no printed words, logos, text, captions or watermarks. Leave lower third clear for subtitle overlays.',
    '01-cover: A cinematic title cover illustration of the story setting, WITHOUT text (DClips overlays the title).',
    ...pack.scenes.map((s,i)=>String(i+2).padStart(2,'0')+'-scene: '+s.visual+' (narrated at: '+s.quote+')'),
-   'Please produce each numbered image separately, ideally with a downloadable file. Keep the order and style. Ask me to continue if your image generation limits prevent producing the full set.'
+   'Generate each numbered image separately, not a collage. If your tools allow it, also give me ONE downloadable dclips-images.zip containing only these image files with the exact numbered filenames. Otherwise offer the individual files. Keep visual style consistent. Ask me to continue if image generation limits prevent completing all images.'
   ].join('\n');
  }
  return {prompt,parse,scenesForPart,imagePrompt,wordCount:wc};
