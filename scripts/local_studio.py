@@ -126,7 +126,7 @@ def begin_task(job, kind):
                     if isinstance(timed_cues,list) and 1<=len(timed_cues)<=250:
                         value['caption_segments']=timed_cues
                         value['caption_alignment']='estimated_from_spoken_audio'
-                                # Validate the finished file itself, not merely the input job.
+                # Validate the finished file itself, not merely the input job.
                 # These checks cover MP4 format/codec/resolution, not rights or originality.
                 from quality_check import check_video
                 quality = check_video(result)
