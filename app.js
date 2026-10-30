@@ -1309,7 +1309,7 @@ function cloudImagePanel(current){
  <div class="production-upload"><input id="production-cloud-images" type="file" accept="image/png,image/jpeg,image/webp,.zip,application/zip" multiple aria-label="Choose an image ZIP or select all illustrated scene images"><button type="button" class="button button-ghost" data-action="cloud-clear">Clear selected pictures</button></div>
  <div id="cloud-scene-list">${cloudImageList(current)}</div>
  <p class="footnote">Images are not sent to our site. GitHub Actions will render using the ZIP you explicitly upload to your <strong>private</strong> production repository. Free GitHub Actions minutes have limits.</p>
- <button class="button button-primary" type="button" data-action="cloud-export">⇩ Download online-render pack</button>
+ <button class="button button-primary" type="button" data-action="cloud-export">⇩ Download pack &amp; open GitHub upload</button>
  <div class="secondary-note" style="margin-top:12px">Then <a target="_blank" rel="noopener noreferrer" href="https://github.com/dclipsentertainment/shorts-studio-production/upload/main">upload the ZIP to your private GitHub repository</a> using <strong>Add file → Upload files</strong>. Commit the file. GitHub Actions automatically renders the MP4. Open <a target="_blank" rel="noopener noreferrer" href="https://github.com/dclipsentertainment/shorts-studio-production/actions">GitHub Actions</a> → <strong>Render uploaded DClips video</strong> → latest completed run → <strong>finished-online-video</strong> to get your MP4.</div>
  </section>`;
 }
@@ -1385,12 +1385,15 @@ async function cloudExport(){
   if(blockers.length)throw Error(blockers[0]);
   const job=createRenderJob(projected);
   if(!confirm('Create a private online render ZIP containing the complete narration and '+files.length+' illustrations? You will upload it to your PRIVATE GitHub repo manually. It is not published to social media.'))return;
+  // Start the trusted GitHub upload page only from this confirmed click.
+  // Browser security still requires the user to choose and commit the ZIP there.
+  if(typeof window.open==='function')window.open('https://github.com/dclipsentertainment/shorts-studio-production/upload/main','_blank','noopener,noreferrer');
   productionBusy=true;const bytes=await window.DClipsCloudPack.packageJob(job,files);
   const name='cloud-render-'+new Date().toISOString().replace(/[-:TZ.]/g,'').slice(0,14)+'-'+Math.random().toString(36).slice(2,8)+'.zip';
   const objectUrl=URL.createObjectURL(new Blob([bytes],{type:'application/zip'}));
   const a=document.createElement('a');a.href=objectUrl;a.download=name;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(objectUrl),10000);
-  notice('Private render ZIP downloaded. Upload it to your private GitHub production repo to start the cloud render.');
+  notice('ZIP downloaded. The private GitHub upload page is opening; choose the ZIP there and commit it to start rendering.');
  }catch(e){notice('Online render pack not ready: '+e.message)}finally{productionBusy=false;}
 }
 
