@@ -1,29 +1,46 @@
-# GitHub source control and app updates
+# DClips Shorts Studio — one download, automatic updates
 
-## Before you have a GitHub account
-Open `OPEN-DASHBOARD.cmd` normally. No setup, automatic update, or network request occurs until you enable updates. Your existing browser data remains local.
+## Your GitHub repos
 
-## After creating one free GitHub account
+- **Public app:** https://github.com/dclipsentertainment/shorts-studio-app
+- **Private video production:** https://github.com/dclipsentertainment/shorts-studio-production
 
-Create **two repositories** under the same login:
+Your app source, separate navigable pages, Windows launchers and release packages are versioned on GitHub. API keys, YouTube OAuth credentials, video jobs and private production reports stay in the **private** production repository, never the public app.
 
-1. `shorts-studio-app` — **Public**. Contains only application code (nothing sensitive). Upload the contents of `Shorts_Studio_Public_App_Repo_v0_14.zip` from the download. On GitHub choose **Add file → Upload files** and commit to `main`. Be sure the hidden `.github` folder is included, including `.github/workflows/release-app.yml`.
-2. `shorts-studio-production` — **Private**. Later, store render jobs, properly licensed footage and workflow runs there. Do not place video footage, API keys, account tokens or saved browser backups in the public repository. Keep large footage out of Git when possible.
+## Download once (Windows)
 
-Do not share your GitHub password. Enable two-factor authentication.
+1. Download the newest `shorts-studio-app.zip` at https://github.com/dclipsentertainment/shorts-studio-app/releases/latest.
+2. Extract it once to a folder you can write to, such as `Documents\DClips`.
+3. Each time you want to use the app, double-click **OPEN-DASHBOARD.cmd** in that folder.
+4. The launcher automatically looks for the latest stable release from the pinned public GitHub repo. If newer, the updater checks the ZIP's GitHub-published SHA-256 digest and installs **application files only**, then opens the dashboard.
+5. If you are offline or GitHub is temporarily unavailable, the installed app opens anyway.
 
-### Publish the first release
+**You do not need to download a second ZIP for later app releases**, run Git, enter credentials, or run the one-time SETUP-UPDATES script. `OPEN-PRODUCTION-STUDIO.cmd` also checks for updates when opened directly; `CHECK-FOR-UPDATES.cmd` checks and installs updates on demand.
 
-In your public repo, select **Actions → Publish Shorts Studio app release → Run workflow**. Enter `v0.14.0`. If GitHub asks to enable workflows or give Actions read/write permissions, follow the repository's own security settings. The workflow creates a **code-only** `shorts-studio-app.zip` release asset; it deliberately excludes jobs, assets, private reports and user data. It works only after the workflow file has been uploaded. You may need to permit Actions to create releases via repository **Settings → Actions → General → Workflow permissions → Read and write permissions**.
+**Windows requirement:** Windows PowerShell and the ability to run batch scripts; no admin privileges or installation of Git. The app opens in the browser if Python is unavailable. Local MP4 rendering requires Python and FFmpeg, but the private GitHub production workflows can render online.
 
-After the workflow succeeds, open your installed Shorts Studio folder and double-click **SETUP-UPDATES.cmd**. Enter `YOURUSERNAME/shorts-studio-app` (your actual GitHub username). The setting is saved only on your own computer.
+### Data safety
 
-After that, use **OPEN-DASHBOARD.cmd** every time. It checks GitHub's *latest published stable release* via HTTPS, compares semantic versions, verifies the release ZIP's GitHub SHA-256 digest, updates application code, and opens the dashboard. If there is no internet or GitHub is unavailable, it opens your existing version instead. `CHECK-FOR-UPDATES.cmd` lets you run the updater manually while the browser is closed. No administrator rights, Git installation or personal access tokens are required for updating a public repository.
+- The updater only replaces its allowlisted program files and retains rollback copies temporarily if installing a replacement fails.
+- It does not touch `user-data/`, `assets/`, `jobs/`, `reports/`, `output/` or browser localStorage.
+- Back up your channels and projects from **Setup & backups → Export backup**. Browser profiles/origins store different copies.
+- Installing in a **new folder** or switching between the local file, local server, and a GitHub Pages website can show different browser-stored data. Import your saved backup if needed.
+- For security, this app always updates from **dclipsentertainment/shorts-studio-app**, not an arbitrary configurable repository. Do not replace the updater with scripts from strangers.
 
-**This updates application code only**, not content projects or connected-account data. Your channel and project information is stored in your browser's localStorage; export backups regularly. Do not rename or move the installed folder if you want browser-local data to remain in the same place. The updater never touches `assets/`, `jobs/`, `reports/`, `output/` or `user-data/`.
+## Different pages
 
-### How future releases work
+Open the app sidebar to switch among Overview, Channels, Production flow, Content studio, Preview & subtitles, Clip scout, Viral radar, Trend discovery, Publishing queue, Analytics, GitHub usage, Growth lab, Creative lab, ChatGPT script desk, Competitors, Quality gate, and Setup & backups. Each page has a shareable hash route like `index.html#usage`.
 
-Each new release gets a new tag (e.g. `v0.13.1`). The release workflow packages the latest application code without private content. Once published, the next dashboard launch installs it automatically. Merely committing to `main` does **not** update installed apps until a new release has been published.
+## Optional browser version on GitHub Pages
 
-**Important:** Update behaviour is prepared but has **not been exercised against your real GitHub repository or a Windows machine**. GitHub account/repo creation, first release and permissions must be completed before end-to-end verification is possible. If workplace security policies block PowerShell, use manual releases instead. Avoid running the updater from an untrusted repository; you are installing executable code from the configured public source.
+The same static dashboard can be served from GitHub Pages without downloading. In your public repo open **Settings → Pages**, select **Deploy from a branch**, choose **main** and **/(root)**, then Save. After GitHub completes publishing, the intended URL is:
+
+https://dclipsentertainment.github.io/shorts-studio-app/
+
+GitHub Pages only runs the public frontend. Privileged YouTube/API processing remains in private GitHub Actions, and browser-local content is not automatically shared between the Pages site and the Windows dashboard.
+
+## Verified tests
+
+- GitHub workflow `Test DClips self-update on Windows` verified the real Windows updater on GitHub-hosted Windows against an already published release, including checks for preservation of existing `user-data/`.
+- A release must be a newer stable `vX.Y.Z` tag with the prescribed `shorts-studio-app.zip` asset and SHA-256 digest. The packaged `VERSION.json` must match the GitHub tag.
+- Public releases are built from the public repository's `.github/workflows/release-app.yml` and exclude secrets, media, and private projects.
