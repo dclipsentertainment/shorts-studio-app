@@ -1,8 +1,8 @@
 # DClips Shorts Studio — Start here
 
-**Version 0.14.2 | 30 October 2026**
+**Version 0.14.3 | 30 October 2026**
 
-DClips is a GitHub-managed Shorts production dashboard. It has separate pages for planning, video production, previews, trends, publishing, analytics, growth and GitHub Actions usage.
+DClips is a **four-platform** GitHub-managed production dashboard for YouTube Shorts, Instagram Reels, TikTok and Facebook Reels. It has separate pages for planning, video production, previews, trends, publishing, analytics, growth and GitHub Actions usage.
 
 ## One download, then automatic updates
 
