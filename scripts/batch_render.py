@@ -79,33 +79,35 @@ def main() -> int:
         output.mkdir(parents=True, exist_ok=True)
         results = []
         seen = set()
+        skipped = []
         with tempfile.TemporaryDirectory(prefix='shorts-batch-', dir=ROOT / 'jobs') as td:
             scratch = Path(td)
             for pos, (label, data) in enumerate(records, start=1):
-                source = data.get('source') or {}
-                identity = json.dumps({'source': source, 'duration': data.get('duration'),
-                                       'script': data.get('script'), 'channel': data.get('channel'),
-                                       'narration': data.get('narration')}, sort_keys=True)
+                # Exclude only metadata that cannot alter rendered output.
+                identity = json.dumps({key:value for key,value in data.items()
+                                       if key not in ('id','generated_at','description')},
+                                      sort_keys=True, separators=(',',':'), allow_nan=False)
                 fingerprint = hashlib.sha256(identity.encode()).hexdigest()
                 if fingerprint in seen:
+                    skipped.append({'job':label,'reason':'Identical output settings','fingerprint':fingerprint})
                     print(f'Skipping duplicate: {label}')
                     continue
                 seen.add(fingerprint)
                 job_path = scratch / f'job-{pos:02d}.json'
                 job_path.write_text(json.dumps(data, ensure_ascii=False), encoding='utf-8')
                 print(f'Rendering {label}', flush=True)
-                movie = render(job_path, output)
-                # Two different jobs may have the same title. Keep both outputs.
-                uniquely_named = output / f'{movie.stem}-{pos:02d}-{fingerprint[:8]}.mp4'
-                movie.replace(uniquely_named)
+                job_output = output / f'job-{pos:02d}-{fingerprint[:8]}'
+                job_output.mkdir(parents=True, exist_ok=True)
+                movie = render(job_path, job_output)
+                uniquely_named = movie
                 results.append({'job': label, 'channel': data.get('channel', ''),
-                                'title': data.get('title', ''), 'video': uniquely_named.name,
+                                'title': data.get('title', ''), 'video': uniquely_named.relative_to(output).as_posix(),
                                 'sha256': hashlib.sha256(uniquely_named.read_bytes()).hexdigest(),
                                 'source_fingerprint': fingerprint})
         if not results:
             raise JobError('Every selected job was a duplicate; nothing rendered')
         (output / 'renders-manifest.json').write_text(json.dumps(
-            {'version': 1, 'renders': results}, indent=2) + '\n', encoding='utf-8')
+            {'version': 1, 'renders': results, 'skipped': skipped}, indent=2) + '\n', encoding='utf-8')
         print(f'Rendered {len(results)} unique videos (render only; no posting)')
         return 0
     except (JobError, ValueError, TypeError, OSError, json.JSONDecodeError) as exc:
@@ -115,3 +117,4 @@ def main() -> int:
 
 if __name__ == '__main__':
     sys.exit(main())
+

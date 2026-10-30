@@ -24,9 +24,11 @@ ROOT = Path(__file__).resolve().parents[1]
 MEDIA = ROOT / 'user-data' / 'media'
 RENDERS = ROOT / 'user-data' / 'renders'
 MAX_MEDIA = 600 * 1024 * 1024
-MAX_JSON = 160 * 1024
+MAX_JSON = 512 * 1024
 TASKS = {}
 LOCK = threading.Lock()
+TASK_SLOTS = threading.BoundedSemaphore(3)
+WORKER = threading.Semaphore(1)
 
 CONTENT_TYPES = {'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.png':'image/png','.json':'application/json; charset=utf-8','.srt':'text/plain; charset=utf-8'}
 ALLOWED_STATIC = {'/','/index.html','/app.js','/asmr.js','/story-series.js','/quick-create.js','/cloud-pack.js','/github-usage.js','/styles.css','/assets/example-background.mp4'}
@@ -84,6 +86,8 @@ def validate_job(payload):
 
 
 def begin_task(job, kind):
+    if not TASK_SLOTS.acquire(blocking=False):
+        raise ValueError('The local queue is full (one active job and two waiting). Try again when a job finishes.')
     task_id=uuid.uuid4().hex
     with LOCK:
         TASKS[task_id]={'status':'queued','kind':kind,'created_at':time.time(),'message':'Waiting for renderer'}
@@ -92,66 +96,71 @@ def begin_task(job, kind):
             if TASKS[key]['created_at'] < time.time()-86400:
                 del TASKS[key]
     def work():
-        with LOCK: TASKS[task_id].update(status='working',message='Processing locally…')
         try:
-            if kind=='render':
-                from render import render
-                job_file = RENDERS / f'{task_id}.json'
-                job_file.write_text(json.dumps(job,ensure_ascii=False),encoding='utf-8')
-                result=render(job_file,RENDERS/task_id)
-                value={'status':'done','message':'MP4 rendered successfully','video_url':f'/output/{task_id}/{result.name}'}
-                if job.get('auto_align') and job.get('narration',{}).get('mode')=='basic':
-                    with LOCK: TASKS[task_id]['message']='Aligning narration speech (optional model)…'
-                    try:
+            with WORKER:
+                with LOCK: TASKS[task_id].update(status='working',message='Processing locally…')
+                try:
+                    if kind=='render':
+                        from render import render
+                        job_file = RENDERS / f'{task_id}.json'
+                        job_file.write_text(json.dumps(job,ensure_ascii=False),encoding='utf-8')
+                        result=render(job_file,RENDERS/task_id)
+                        value={'status':'done','message':'MP4 rendered successfully','video_url':f'/output/{task_id}/{result.name}'}
+                        if job.get('auto_align') and job.get('narration',{}).get('mode')=='basic':
+                            with LOCK: TASKS[task_id]['message']='Aligning narration speech (optional model)…'
+                            try:
+                                from transcribe import transcribe
+                                from render import duration_of
+                                runtime=min(600,duration_of(result))
+                                cues,detected=transcribe(result,0,runtime,'tiny',None,4)
+                                if cues:
+                                    job['caption_segments']=cues
+                                    job_file.write_text(json.dumps(job,ensure_ascii=False),encoding='utf-8')
+                                    result=render(job_file,RENDERS/task_id)
+                                    value['caption_segments']=cues
+                                    value['message']='MP4 rendered with speech-aligned captions'
+                                else: value['warning']='No speech was recognised; estimated captions kept.'
+                            except Exception as exc:
+                                value['warning']='Speech alignment was unavailable: '+str(exc)[-170:]
+
+                        # Return word-timed caption edits from the real generated narration.
+                        # The editor can correct them and re-render; they aren't preapproved.
+                        timed_sidecar=result.with_suffix('.captions.json')
+                        if timed_sidecar.is_file():
+                            parsed=json.loads(timed_sidecar.read_text(encoding='utf-8'))
+                            timed_cues=parsed.get('segments')
+                            if isinstance(timed_cues,list) and 1<=len(timed_cues)<=900:
+                                value['caption_segments']=timed_cues
+                                value['caption_alignment']='estimated_from_spoken_audio'
+                        # Validate the finished file itself, not merely the input job.
+                        # These checks cover MP4 format/codec/resolution, not rights or originality.
+                        from quality_check import check_video
+                        quality = check_video(result)
+                        value['quality_report'] = quality
+                        value['actual_duration_seconds'] = quality['duration_seconds']
+                        (RENDERS / task_id / 'quality-report.json').write_text(
+                            json.dumps(quality, indent=2) + '\n', encoding='utf-8')
+                        if quality['status'] == 'fail':
+                            value['warning'] = 'Technical quality check failed; do not approve this video.'
+                        elif quality['warnings']:
+                            value['warning'] = '; '.join(quality['warnings'][:3])
+
+                    elif kind=='images':
+                        from scene_automation import generate_scene_images
+                        with LOCK: TASKS[task_id]['message']='Generating illustrated scenes with the configured API (billable)…'
+                        pictures=generate_scene_images(job)
+                        value={'status':'done','message':f'{len(pictures)} scene images prepared; review every picture before rendering.','images':pictures}
+                    else:
                         from transcribe import transcribe
-                        from render import duration_of
-                        runtime=min(600,duration_of(result))
-                        cues,detected=transcribe(result,0,runtime,'tiny',None,4)
-                        if cues:
-                            job['caption_segments']=cues
-                            job_file.write_text(json.dumps(job,ensure_ascii=False),encoding='utf-8')
-                            result=render(job_file,RENDERS/task_id)
-                            value['caption_segments']=cues
-                            value['message']='MP4 rendered with speech-aligned captions'
-                        else: value['warning']='No speech was recognised; estimated captions kept.'
-                    except Exception as exc:
-                        value['warning']='Speech alignment was unavailable: '+str(exc)[-170:]
-
-                # Return word-timed caption edits from the real generated narration.
-                # The editor can correct them and re-render; they aren't preapproved.
-                timed_sidecar=result.with_suffix('.captions.json')
-                if timed_sidecar.is_file():
-                    parsed=json.loads(timed_sidecar.read_text(encoding='utf-8'))
-                    timed_cues=parsed.get('segments')
-                    if isinstance(timed_cues,list) and 1<=len(timed_cues)<=250:
-                        value['caption_segments']=timed_cues
-                        value['caption_alignment']='estimated_from_spoken_audio'
-                # Validate the finished file itself, not merely the input job.
-                # These checks cover MP4 format/codec/resolution, not rights or originality.
-                from quality_check import check_video
-                quality = check_video(result)
-                value['quality_report'] = quality
-                (RENDERS / task_id / 'quality-report.json').write_text(
-                    json.dumps(quality, indent=2) + '\n', encoding='utf-8')
-                if quality['status'] == 'fail':
-                    value['warning'] = 'Technical quality check failed; do not approve this video.'
-                elif quality['warnings']:
-                    value['warning'] = '; '.join(quality['warnings'][:3])
-
-            elif kind=='images':
-                from scene_automation import generate_scene_images
-                with LOCK: TASKS[task_id]['message']='Generating illustrated scenes with the configured API (billable)…'
-                pictures=generate_scene_images(job)
-                value={'status':'done','message':f'{len(pictures)} scene images prepared; review every picture before rendering.','images':pictures}
-            else:
-                from transcribe import transcribe
-                path=media_path(job['media'])
-                cues,lang=transcribe(path,float(job.get('start') or 0),float(job['duration']),job.get('model','tiny'),None,int(job.get('words_per_cue',4)))
-                if not cues: raise ValueError('No recognisable speech detected in the selected audio.')
-                value={'status':'done','message':f'{len(cues)} subtitle cues generated. Review them before rendering.','caption_segments':cues,'language':lang}
-        except Exception as e:
-            value={'status':'failed','message':str(e)[-700:]}
-        with LOCK: TASKS[task_id].update(value)
+                        path=media_path(job['media'])
+                        cues,lang=transcribe(path,float(job.get('start') or 0),float(job['duration']),job.get('model','tiny'),None,int(job.get('words_per_cue',4)))
+                        if not cues: raise ValueError('No recognisable speech detected in the selected audio.')
+                        value={'status':'done','message':f'{len(cues)} subtitle cues generated. Review them before rendering.','caption_segments':cues,'language':lang}
+                except Exception as e:
+                    value={'status':'failed','message':str(e)[-700:]}
+                with LOCK: TASKS[task_id].update(value)
+        finally:
+            TASK_SLOTS.release()
     threading.Thread(target=work,daemon=True).start()
     return task_id
 
@@ -215,6 +224,7 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header('Content-Type',CONTENT_TYPES.get(path.suffix.lower(),'application/octet-stream'))
             self.send_header('Content-Length',str(length));self.send_header('Accept-Ranges','bytes')
             self.send_header('X-Content-Type-Options','nosniff');self.send_header('Cache-Control','no-store')
+            self.send_header('Content-Security-Policy',"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self' https://api.github.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
             if range_header:self.send_header('Content-Range',f'bytes {start}-{end}/{size}')
             self.end_headers()
             with path.open('rb') as f:
@@ -304,3 +314,4 @@ def main():
     finally:server.server_close()
 
 if __name__=='__main__':main()
+

@@ -63,7 +63,9 @@ def segment_words(words: list[dict], end_limit: float, max_words: int = 4) -> li
         if t.endswith(('.', '!', '?')):
             flush()
     flush()
-    return result[:250]
+    if len(result)>900:
+        raise ValueError('Transcript exceeds 900 cues. Increase words per cue or split the story.')
+    return result
 
 def job_source(file: Path) -> tuple[Path, float, float]:
     payload = json.loads(file.read_text(encoding='utf-8'))
@@ -84,8 +86,8 @@ def job_source(file: Path) -> tuple[Path, float, float]:
 def transcribe(media: Path, clip_start: float, duration: float, model_name: str, language: str | None, max_words: int) -> tuple[list[dict], str | None]:
     if shutil.which('ffmpeg') is None:
         raise RuntimeError('FFmpeg not found. Add FFmpeg to PATH or run through GitHub Actions.')
-    if not (math.isfinite(clip_start) and clip_start >= 0 and math.isfinite(duration) and 3 <= duration <= 180):
-        raise ValueError('Clip start must be >= 0 and duration must be 3–180 seconds.')
+    if not (math.isfinite(clip_start) and clip_start >= 0 and math.isfinite(duration) and 3 <= duration <= 600):
+        raise ValueError('Clip start must be >= 0 and duration must be 3–600 seconds.')
     try:
         from faster_whisper import WhisperModel
     except ImportError as exc:
@@ -93,7 +95,7 @@ def transcribe(media: Path, clip_start: float, duration: float, model_name: str,
     with tempfile.TemporaryDirectory(prefix='shorts_transcribe_') as folder:
         wav=Path(folder)/'clip.wav'
         cmd=['ffmpeg','-nostdin','-hide_banner','-loglevel','error','-y','-ss',str(clip_start),'-i',str(media),'-t',str(duration),'-vn','-ar','16000','-ac','1','-c:a','pcm_s16le',str(wav)]
-        run=subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False)
+        run=subprocess.run(cmd, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, check=False, timeout=900)
         if run.returncode or not wav.exists() or wav.stat().st_size < 1024:
             raise RuntimeError(f'Could not extract speech audio: {run.stderr.strip()[-500:]}')
         engine=WhisperModel(model_name, device='cpu', compute_type='int8')
@@ -137,3 +139,4 @@ def main() -> int:
 
 if __name__=='__main__':
     sys.exit(main())
+

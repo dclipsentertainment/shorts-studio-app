@@ -29,7 +29,7 @@ class JobError(Exception):
 
 def run(args: list[str], *, capture: bool = False) -> str:
     result = subprocess.run(args, text=True, stdout=subprocess.PIPE if capture else None,
-                            stderr=subprocess.PIPE if capture else None, check=False)
+                            stderr=subprocess.PIPE if capture else None, check=False, timeout=900)
     if result.returncode != 0:
         detail = (result.stderr or '').strip()[-2000:]
         raise JobError(f"Command failed ({result.returncode}): {args[0]}\n{detail}")
@@ -361,14 +361,37 @@ def make_kinetic(script: str, runtime: float, title: str, dest: Path) -> bool:
         grouped.append((chunk[0][0],chunk[-1][1],' '.join(x[2] for x in chunk)))
     return kinetic_ass_events(grouped,title,dest)
 
+def narration_chunks(script: str, limit: int = 1800) -> list[str]:
+    """Keep complete sentences while bounding individual speech requests."""
+    clean = re.sub(r'\[[^]]+\]', '', script).strip()
+    if not clean or len(clean) > 10000:
+        raise JobError('Narration requires 1–10,000 characters.')
+    from story_text import sentence_units
+    sentences = sentence_units(clean)
+    chunks = []
+    current = ''
+    for sentence in sentences:
+        if len(sentence) > limit:
+            raise JobError('One narration sentence is too long. Add a natural sentence boundary.')
+        combined = (current + ' ' + sentence).strip()
+        if len(combined) > limit:
+            chunks.append(current)
+            current = sentence
+        else:
+            current = combined
+    if current:
+        chunks.append(current)
+    return chunks
+
+
 def voice_flite(script: str, path: Path, tempdir: Path) -> Path:
     if ' flite ' not in run(['ffmpeg','-hide_banner','-filters'],capture=True):
         raise JobError('This FFmpeg build has no Flite voice. Select no narration or provide an audio file.')
     clean = re.sub(r'\[[^]]+\]', '', script).strip()
-    if not clean:
-        raise JobError('Free basic voice needs a non-empty script.')
+    if not clean or len(clean)>10000:
+        raise JobError('Free basic voice requires 1–10,000 characters.')
     script_path=tempdir/'speech.txt'
-    script_path.write_text(clean[:4000],encoding='utf-8')
+    script_path.write_text(clean,encoding='utf-8')
     # The temp path is generated without spaces/special FFmpeg delimiter chars.
     filter_str=f'flite=textfile={script_path}:voice=slt'
     run(['ffmpeg','-hide_banner','-loglevel','error','-y','-f','lavfi','-i',filter_str,
@@ -393,8 +416,8 @@ def voice_piper(script: str, path: Path, model_name: str) -> Path:
     if model_name not in PIPER_VOICES:
         raise JobError("Unapproved Piper voice model. Choose one of: " + ", ".join(PIPER_VOICES))
     cleaned = re.sub(r'\[[^]]+\]', '', script).strip()
-    if not cleaned or len(cleaned) > 4000:
-        raise JobError("Piper narration requires a script between 1 and 4000 characters.")
+    if not cleaned or len(cleaned) > 10000:
+        raise JobError("Piper narration requires a script between 1 and 10000 characters.")
     model_dir = ROOT / ".voice-models"
     model_file = model_dir / (model_name + ".onnx")
     config_file = model_dir / (model_name + ".onnx.json")
@@ -422,8 +445,8 @@ def voice_kokoro(script: str, path: Path, voice_name: str, speed: float = 0.96) 
     if not math.isfinite(speed) or not 0.8 <= speed <= 1.15:
         raise JobError("Kokoro voice speed must be between 0.8 and 1.15.")
     clean = re.sub(r'\[[^]]+\]', '', script).strip()
-    if not clean or len(clean) > 4000:
-        raise JobError("Kokoro narration requires a script between 1 and 4000 characters.")
+    if not clean or len(clean) > 10000:
+        raise JobError("Kokoro narration requires a script between 1 and 10000 characters.")
     model_dir = ROOT / ".voice-models" / "kokoro"
     model_file = model_dir / "kokoro-v1.0.onnx"
     voices_file = model_dir / "voices-v1.0.bin"
@@ -433,8 +456,20 @@ def voice_kokoro(script: str, path: Path, voice_name: str, speed: float = 0.96) 
         import soundfile as sf
         from kokoro_onnx import Kokoro
         model = Kokoro(str(model_file), str(voices_file))
-        samples, rate = model.create(clean, voice=voice_name, speed=speed, lang=KOKORO_VOICES[voice_name])
-        sf.write(str(path), samples, rate, subtype="PCM_16")
+        import numpy as np
+        pieces=[]; rate=None; total=0
+        for text in narration_chunks(clean):
+            samples, sample_rate = model.create(text, voice=voice_name, speed=speed, lang=KOKORO_VOICES[voice_name])
+            if rate is not None and rate != sample_rate:
+                raise JobError('Narration chunks have incompatible sample rates.')
+            rate=sample_rate
+            samples=np.asarray(samples)
+            if samples.ndim!=1 or not len(samples) or not np.isfinite(samples).all():
+                raise JobError('Narrator returned invalid audio.')
+            if pieces:pieces.append(np.zeros(round(rate*.12),dtype=samples.dtype));total+=round(rate*.12)
+            pieces.append(samples);total+=len(samples)
+            if total/rate>600:raise JobError('Narration exceeds ten minutes. Split the story.')
+        sf.write(str(path), np.concatenate(pieces), rate, subtype="PCM_16")
     except (ImportError, ValueError, RuntimeError, OSError) as exc:
         raise JobError(f"Kokoro neural voice generation failed: {type(exc).__name__}") from exc
     if not path.is_file() or path.stat().st_size < 1000:
@@ -727,3 +762,4 @@ def main() -> int:
 
 if __name__=='__main__':
     sys.exit(main())
+

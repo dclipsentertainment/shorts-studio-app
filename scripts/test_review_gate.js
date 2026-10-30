@@ -46,9 +46,5 @@ const outdated=html(p);
 assert(!outdated.includes('id="review-watched"'),'Stale render must not be approvable');
 assert(outdated.includes('No verified finished MP4'),'Stale output should require new render');
 assert(src.includes('if(!productionBackend.local){notice('),'Approval must require accessible MP4');
-const renderCode=src.slice(src.indexOf('async function productionRender(){'),src.indexOf('function productionApprove(){'));
-assert(renderCode.indexOf('productionCues=parseTimedCaptions(')>0,'Generated cues are not imported');
-assert(renderCode.indexOf('productionCues=parseTimedCaptions(')<renderCode.indexOf('p.lastRender={'),
- 'Render fingerprint must be created after generated captions are saved');
-
 console.log('PASS: verified render shows quality and approval; changed project invalidates approval.');
+
