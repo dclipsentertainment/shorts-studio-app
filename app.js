@@ -6,7 +6,7 @@
 const STORE_KEY = 'shorts_studio_state_v1';
 const RECOVERY_KEY = 'shorts_studio_recovery_v1';
 const APP_VERSION = '0.14.0';
-const views = {overview:'Overview',channels:'Channels',production:'Production flow',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
+const views = {overview:'Overview',channels:'Channels',production:'Production flow',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',usage:'GitHub usage',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
 const palettes = ['#8c7aff','#ef7ab6','#50bdc3','#e9a868','#5abb92','#6b95f1'];
 const initial = () => ({version:1,channels:[],projects:[],scoutReports:[],trends:[],discovery:null,viralThreshold:100000,createdAt:new Date().toISOString(),demo:false});
 const $ = s => document.querySelector(s);
@@ -76,7 +76,8 @@ function render(){
  $('#today-date').textContent=new Date().toLocaleDateString('en-IE',{weekday:'short',day:'numeric',month:'short'});
  $('#crumb-current').textContent=views[page];
  document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===page));
- const main=$('#main');main.innerHTML=({overview:overview,channels:channelsPage,production:productionPage,studio:studioPage,queue:queuePage,scout:scoutPage,radar:radarPage,discover:discoverPage,analytics:analyticsPage,growth:growthPage,creative:creativePage,ai:aiDeskPage,preview:previewPage,quality:qualityPage,competitors:competitorsPage,setup:setupPage}[page])();
+ const main=$('#main');main.innerHTML=({overview:overview,channels:channelsPage,production:productionPage,studio:studioPage,queue:queuePage,scout:scoutPage,radar:radarPage,discover:discoverPage,analytics:analyticsPage,usage:window.DClipsUsageMonitor.render,growth:growthPage,creative:creativePage,ai:aiDeskPage,preview:previewPage,quality:qualityPage,competitors:competitorsPage,setup:setupPage}[page])();
+ if(page==='usage')window.DClipsUsageMonitor.afterRender();
  if(page==='preview')previewRestoreDisplay();
  if(page==='production'){productionRestoreDisplay();productionCheckBackend();}
 }
