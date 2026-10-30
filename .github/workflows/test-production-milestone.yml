@@ -4,6 +4,8 @@ on:
   push:
     paths:
       - scripts/render.py
+      - scripts/scene_automation.py
+      - scripts/test_scene_automation.py
       - scripts/local_studio.py
       - scripts/quality_check.py
       - scripts/test_local_production.py
@@ -33,6 +35,7 @@ jobs:
           python -m compileall -q scripts
           python scripts/test_local_production.py
           python scripts/test_story_duration.py
+          python scripts/test_scene_automation.py
       - name: Verify dashboard JavaScript
         run: |
           node --check app.js
