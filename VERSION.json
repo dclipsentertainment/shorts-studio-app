@@ -1,6 +1,6 @@
 {
-  "version": "0.14.1",
+  "version": "0.14.2",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "GitHub Actions usage dashboard, daily private reports, optional live billing, session-only read-only GitHub access and allowance estimates"
+  "notes": "Download once and automatically update DClips via verified GitHub releases at every Windows launch; separate pages and retained local data"
 }
