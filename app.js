@@ -1036,7 +1036,7 @@ Why it matters">${esc((current.visualScenes||[]).map(x=>(x.start_seconds==null?'
     <div class="preview-actions"><button class="button button-primary" data-action="production-save">✓ Save script & settings</button><button class="button" data-action="production-estimate">✦ Estimate caption timings</button></div>
     `:''}
  </section><section class="panel production-timing"><div class="panel-head"><h2>2. Subtitles & preview</h2><span class="tiny-muted" id="production-cue-count">${productionCues.length} cues</span></div>
- <div class="production-video" id="production-stage"><div class="production-backdrop" id="production-backdrop" ${!src&&current?.kind==='original'?'':'hidden'}><div class="production-sky"></div><span id="production-scene-preview">STORYBOARD PREVIEW</span></div><video id="production-video" controls playsinline preload="metadata" src="${esc(src||'')}"></video><div id="production-live-caption" class="preview-caption" role="button" tabindex="0" aria-label="Drag caption to reposition" title="Drag caption to move it" hidden></div><div id="production-video-empty" ${src||current?.kind==='original'?'hidden':''}>Select your video, or preview the included demo.</div></div>
+ <div class="production-video" id="production-stage"><div class="production-backdrop" id="production-backdrop" ${!src&&current?.kind==='original'?'':'hidden'}><img id="production-scene-photo" alt="Uploaded illustration for this part of the story" hidden><div class="production-sky"></div><span id="production-scene-preview">STORYBOARD PREVIEW</span></div><video id="production-video" controls playsinline preload="metadata" src="${esc(src||'')}"></video><div id="production-live-caption" class="preview-caption" role="button" tabindex="0" aria-label="Drag caption to reposition" title="Drag caption to move it" hidden></div><div id="production-video-empty" ${src||current?.kind==='original'?'hidden':''}>Select your video, or preview the included demo.</div></div>
  <div class="preview-actions"><button class="button button-primary small" data-action="production-play">▶ Play preview</button><button class="button small" data-action="production-stop">■ Stop</button><button class="button small" data-action="production-transcribe" ${!current?'disabled':''}>✧ Transcribe source audio</button><button class="button small" data-action="production-import-cues" ${!current?'disabled':''}>⇧ Import subtitles</button><input type="file" id="production-cue-file" hidden accept=".srt,.vtt,.json"></div>
  <div class="panel caption-edit-panel"><h3>Caption text and position</h3><p class="secondary-note">Seek to a caption, edit its wording, then drag it on the preview. Position is preserved in the rendered video.</p>
  <div class="form-field"><label for="production-caption-text">Current subtitle / headline</label><textarea id="production-caption-text" class="field" rows="2" maxlength="160" placeholder="Edit text, then click Apply"></textarea></div>
@@ -1085,14 +1085,36 @@ function productionPaint(){const host=$('#production-cues');if(!host)return;
  productionUpdateOverlay();
 }
 function productionUpdateScenePreview(){
- const target=$('#production-scene-preview'),bg=$('#production-backdrop');if(!target||!bg)return;
- const input=$('#production-scenes');const rows=(input?.value||'').split(/\r?\n/).map(x=>x.split(' | ')[0].trim()).filter(Boolean);
+ const target=$('#production-scene-preview'),bg=$('#production-backdrop'),photo=$('#production-scene-photo');
+ if(!target||!bg)return;
+ const illustrated=$('#production-visual-mode')?.value==='illustrated';
+ bg.dataset.mode=illustrated?'illustrated':'legacy';
+ const raw=($('#production-scenes')?.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+ const rows=raw.map(line=>{
+  const p=line.indexOf(' | ');const head=(p<0?line:line.slice(0,p)).trim();
+  const mt=head.match(/^([0-9]+(?:\.[0-9]+)?)@(.+)$/);
+  return {headline:mt?mt[2].trim():head,start:mt?Number(mt[1]):null,image:p<0?'':line.slice(p+3).trim()};
+ });
  const script=($('#production-script')?.value||'').split(/(?<=[.!?])\s+|\n+/).map(x=>x.trim()).filter(Boolean);
- const scenes=rows.length?rows:script.slice(0,5).map(x=>x.slice(0,90));
- const d=Number($('#production-length')?.value)||30;
- const i=Math.min(scenes.length-1,Math.max(0,Math.floor(productionStoryboardTime/Math.max(.01,d/(scenes.length||1)))));
- target.textContent=scenes.length?scenes[i]:'STORYBOARD PREVIEW';
+ const current=productionStoryboardTime, duration=Number($('#production-length')?.value)||30;
+ let index=0;
+ if(illustrated&&rows.length>1){
+  const t=Math.max(0,current-2),beats=rows.slice(1);
+  const explicit=beats.every(s=>s.start!==null)&&beats[0]?.start===0;
+  index=current<2?0:1+(explicit?Math.max(0,beats.findLastIndex(x=>t>=x.start)):Math.min(beats.length-1,Math.floor(t/Math.max(.01,(duration-2)/beats.length))));
+ }else{
+  const num=rows.length||Math.min(script.length,5)||1;
+  index=Math.min(num-1,Math.max(0,Math.floor(current/Math.max(.01,duration/num))));
+ }
+ const scene=rows[index],label=scene?.headline||script[index]?.slice(0,90)||'STORYBOARD PREVIEW';
+ target.textContent=illustrated?(index===0?($('#production-title')?.value||label):''):label;
  bg.dataset.theme=$('#production-visual-theme')?.value||'aurora';
+ if(photo){
+  const match=scene?.image?.match(/^user-data\/media\/([a-f0-9]{32}\.(?:jpg|jpeg|png|webp))$/);
+  const url=match&&productionBackend.local?'/local-media/'+match[1]:'';
+  if(url){if(photo.getAttribute('src')!==url)photo.src=url;photo.hidden=false}
+  else{photo.hidden=true;photo.removeAttribute('src')}
+ }
 }
 function productionUpdateOverlay(){
  const v=$('#production-video'),caption=$('#production-live-caption');if(!v||!caption)return;
