@@ -251,7 +251,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 def make_ass_timed(segments: list, runtime: float, title: str, dest: Path, style: str) -> bool:
     """Render user-supplied, speech-aligned timings; do not guess where words occur."""
     if not isinstance(segments, list) or len(segments) > 250:
-        raise JobError('Timed captions must be an array of up to 250 segments.')
+        raise JobError('Timed captions must be an array of up to 900 segments.')
     if not segments:
         return False
     header = """[Script Info]
@@ -502,8 +502,8 @@ def render(job_path: Path, out_dir: Path) -> Path:
     if kind not in ('clip','original'):
         raise JobError('Kind must be clip or original.')
     requested=float(data.get('duration') or 30)
-    if not math.isfinite(requested) or not 3<=requested<=180:
-        raise JobError('Duration must be between 3 and 180 seconds.')
+    if not math.isfinite(requested) or not 3<=requested<=(600 if kind=='original' else 180):
+        raise JobError('Clips allow 3–180 seconds; original stories allow 3–600 seconds.')
     source=data.get('source') or {}
     start=float(source.get('start_seconds') or 0)
     if not math.isfinite(start) or start<0:
@@ -574,7 +574,7 @@ def render(job_path: Path, out_dir: Path) -> Path:
             voice=voice_kokoro(script,tempdir/'kokoro-narration.wav',str(narration.get('voice') or 'af_heart'),float(narration.get('speed',0.96)))
         runtime=requested
         if kind=='original' and voice:
-            runtime=min(180,max(requested,duration_of(voice)+intro_seconds+0.2))
+            runtime=min(600,max(requested,duration_of(voice)+intro_seconds+0.2))
         if kind=='clip' and source_length:
             runtime=min(runtime,source_length-start)
         if procedural and visual_mode in ('storyboard','illustrated'):
