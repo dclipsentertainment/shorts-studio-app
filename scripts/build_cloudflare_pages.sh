@@ -8,6 +8,7 @@ node --check github-usage.js
 node scripts/test_github_usage.js
 node scripts/test_review_gate.js
 node scripts/test_caption_ui.js
+node scripts/test_illustrated_ui.js
 mkdir -p dist-cloudflare
 rm -f dist-cloudflare/index.html dist-cloudflare/styles.css dist-cloudflare/app.js dist-cloudflare/github-usage.js dist-cloudflare/_headers
 for file in index.html app.js github-usage.js styles.css; do
