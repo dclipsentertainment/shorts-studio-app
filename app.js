@@ -1252,7 +1252,7 @@ function cloudVideoPanel(current){
 }
 function cloudReceiveVideo(file){
  const p=productionProject();if(!p||!file)return;
- if(!/\\.mp4$/i.test(file.name)||file.size<1000||file.size>500*1024*1024){notice('Choose a finished MP4 under 500 MiB.');return}
+ if(!/\.mp4$/i.test(file.name)||file.size<1000||file.size>500*1024*1024){notice('Choose a finished MP4 under 500 MiB.');return}
  const previous=cloudFinishedPreviews.get(p.id);
  if(previous)URL.revokeObjectURL(previous.url);
  cloudFinishedPreviews.set(p.id,{url:URL.createObjectURL(file),name:file.name,fingerprint:renderFingerprint(p)});
