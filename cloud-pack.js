@@ -165,6 +165,80 @@
   return result;
  }
 
+
+ // GitHub Actions downloads one video artifact ZIP. Open it locally in the
+ // browser so the user does not need to install an unzip tool or extract files.
+ async function videoFromArtifactZip(file){
+  const MAX_VIDEO=200*1024*1024,MAX_ZIP=210*1024*1024;
+  if(!file||!/\.zip$/i.test(file.name||'')||!Number.isFinite(file.size)||file.size<22||file.size>MAX_ZIP)
+   throw Error('Choose a GitHub Actions video artifact ZIP under 210 MiB.');
+  const bytes=new Uint8Array(await file.arrayBuffer()),v=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const rd16=i=>v.getUint16(i,true),rd32=i=>v.getUint32(i,true);
+  if(rd32(0)!==0x04034b50)throw Error('This file is not a ZIP archive.');
+  let eocd=-1;
+  for(let i=bytes.length-22;i>=Math.max(0,bytes.length-65557);i--){
+   if(rd32(i)===0x06054b50&&i+22+rd16(i+20)===bytes.length){eocd=i;break;}
+  }
+  if(eocd<0||rd16(eocd+4)||rd16(eocd+6)||rd16(eocd+8)!==rd16(eocd+10))
+   throw Error('Invalid or multi-disk GitHub artifact ZIP.');
+  const count=rd16(eocd+10),len=rd32(eocd+12),start=rd32(eocd+16);
+  if(count<1||count>5||start===0xffffffff||len===0xffffffff||start+len>eocd)
+   throw Error('Unexpected files in GitHub artifact.');
+  const decoder=new TextDecoder('utf-8',{fatal:true});
+  let pos=start,mp4=null;
+  for(let idx=0;idx<count;idx++){
+   if(pos+46>bytes.length||rd32(pos)!==0x02014b50)throw Error('Corrupt ZIP file table.');
+   const flags=rd16(pos+8),method=rd16(pos+10),crc=rd32(pos+16),
+    clen=rd32(pos+20),ulen=rd32(pos+24),nameLen=rd16(pos+28),
+    extraLen=rd16(pos+30),commentLen=rd16(pos+32),mode=rd32(pos+38)>>>16,local=rd32(pos+42);
+   const end=pos+46+nameLen+extraLen+commentLen;
+   if(end>bytes.length||(flags&1)||!([0,8].includes(method))||(mode&0xf000)===0xa000||clen===0xffffffff||ulen===0xffffffff)
+    throw Error('Encrypted or unsupported video archive entry.');
+   const name=decoder.decode(bytes.subarray(pos+46,pos+46+nameLen));
+   pos=end;
+   if(name.endsWith('/'))continue;
+   const components=name.split('/');
+   if(components.length>3||components.some(x=>!x||x==='..'||x==='.'))throw Error('Unsafe artifact ZIP path.');
+   const basename=components.at(-1);
+   const isVideo=/\.mp4$/i.test(basename),isQuality=basename==='quality-report.json';
+   if(!isVideo&&!isQuality)throw Error('GitHub artifact contains an unexpected file.');
+   if(isVideo&&mp4)throw Error('GitHub artifact must contain exactly one MP4.');
+   const max=isVideo?MAX_VIDEO:100000;
+   if(clen>max||ulen>max||(!isVideo&&ulen<2)||local>=start||local+30>bytes.length||rd32(local)!==0x04034b50)
+    throw Error('Video artifact file is oversized or damaged.');
+   const lname=rd16(local+26),lextra=rd16(local+28),dataStart=local+30+lname+lextra;
+   if(dataStart+clen>start||rd16(local+6)!==flags||rd16(local+8)!==method||
+      decoder.decode(bytes.subarray(local+30,local+30+lname))!==name)
+    throw Error('Artifact ZIP file header mismatch.');
+   if(!isVideo)continue; // Quality report remains informational; never auto-approves content.
+   const payload=bytes.subarray(dataStart,dataStart+clen);
+   let output;
+   if(method===0)output=new Uint8Array(payload);
+   else{
+    if(typeof DecompressionStream!=='function')throw Error('Browser cannot open compressed artifact ZIPs. Extract and select MP4 instead.');
+    try{
+     const stream=new Blob([payload]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+     const reader=stream.getReader(),chunks=[];let size=0;
+     try{
+      while(true){
+       const piece=await reader.read();if(piece.done)break;
+       size+=piece.value.length;
+       if(size>ulen||size>MAX_VIDEO)throw Error('ZIP video exceeds its declared size.');
+       chunks.push(piece.value);
+      }
+     }catch(err){await reader.cancel().catch(()=>{});throw err;}
+     output=concat(chunks);
+    }catch(_){throw Error('Cannot decompress video artifact. Extract ZIP and choose MP4 instead.');}
+   }
+   if(output.length!==ulen||crc32(output)!==crc||output.length<1024||
+      String.fromCharCode(...output.subarray(4,8))!=='ftyp')
+    throw Error('GitHub video artifact is corrupt or is not an MP4.');
+   mp4=new File([output],basename,{type:'video/mp4'});
+  }
+  if(pos!==start+len||!mp4)throw Error('GitHub ZIP has no valid rendered MP4.');
+  return mp4;
+ }
+
  function detect(bytes){
   if(bytes.length>=8&&[137,80,78,71,13,10,26,10].every((b,i)=>bytes[i]===b))return 'png';
   if(bytes.length>=3&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255)return 'jpg';
@@ -201,5 +275,5 @@
   entries.unshift({name:'render-job.json',data:jobBytes});
   return zip(entries);
  }
- return {assign,packageJob,imagesFromArchive,zip,detect,MAX_IMAGE,MAX_TOTAL};
+ return {assign,packageJob,imagesFromArchive,videoFromArtifactZip,zip,detect,MAX_IMAGE,MAX_TOTAL};
 });
