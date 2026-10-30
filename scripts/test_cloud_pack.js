@@ -50,9 +50,13 @@ async function run(){
  wr32(tail,16,header.length+compressed.length);
  const deflated=Uint8Array.from(Buffer.concat([header,compressed,center,tail]));
  assert.deepEqual((await pack.imagesFromArchive(zipFile(deflated))).map(f=>f.name),['01-cover.png']);
- await assert.rejects(()=>pack.imagesFromArchive(zipFile(pack.zip([{name:'../secret.png',data:png}]))),/unsafe filenames/);
+ const sneaky=Uint8Array.from(pack.zip([{name:'01-cover.png',data:png}]));
+ const badPath=new TextEncoder().encode('../foo00.png');
+ const localLen=30,cdAt=new DataView(sneaky.buffer).getUint32(sneaky.length-6,true);
+ sneaky.set(badPath,localLen);sneaky.set(badPath,cdAt+46);
+ await assert.rejects(()=>pack.imagesFromArchive(zipFile(sneaky)),/unsafe filenames/);
  await assert.rejects(()=>pack.imagesFromArchive(zipFile(pack.zip([{name:'story.json',data:png}]))),/only contain PNG/);
- const tampered=Uint8Array.from(artwork);tampered[40]^=1;
+ const tampered=Uint8Array.from(artwork);tampered[45]^=1;
  await assert.rejects(()=>pack.imagesFromArchive(zipFile(tampered)),/integrity|invalid|format/i);
 
  const app=fs.readFileSync('app.js','utf8'),html=fs.readFileSync('index.html','utf8');
