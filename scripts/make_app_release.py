@@ -8,7 +8,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 FILES = [
     'index.html', 'app.js', 'github-usage.js', 'styles.css', 'VERSION.json',
-    'README-FIRST.md', 'README-CLOUDFLARE.md', 'README-GITHUB-USAGE.md', 'README-STORYBOARD.md', 'requirements-visuals.txt', 'README-VISUAL-UPGRADE.md', 'README-PRODUCTION-FLOW.md', 'README-PREVIEW-AND-SUBTITLES.md', 'README-CHATGPT-WORKFLOW.md', 'README-RELEASES.md', '.gitignore',
+    'README-FIRST.md', 'README-STREAMS.md', 'README-CLOUDFLARE.md', 'README-GITHUB-USAGE.md', 'README-STORYBOARD.md', 'requirements-visuals.txt', 'README-VISUAL-UPGRADE.md', 'README-PRODUCTION-FLOW.md', 'README-PREVIEW-AND-SUBTITLES.md', 'README-CHATGPT-WORKFLOW.md', 'README-RELEASES.md', '.gitignore',
     'OPEN-DASHBOARD.cmd', 'OPEN-PRODUCTION-STUDIO.cmd', 'CHECK-FOR-UPDATES.cmd', 'SETUP-UPDATES.cmd',
     '.github/workflows/release-app.yml',
 ]
