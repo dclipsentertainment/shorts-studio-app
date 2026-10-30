@@ -33,6 +33,7 @@ jobs:
         run: |
           node --check app.js
           node --check github-usage.js
+          node scripts/test_github_usage.js
           python -m compileall -q scripts
       - name: Package public code only
         run: python scripts/make_app_release.py --out dist/shorts-studio-app.zip
