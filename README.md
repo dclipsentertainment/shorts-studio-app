@@ -1,6 +1,6 @@
 # DClips Studio — multi-platform creator workspace
 
-**Current version: v0.14.4 | 30 October 2026**
+**Current version: v0.14.5 | 30 October 2026**
 
 DClips is a four-platform creator workspace for **YouTube Shorts, Instagram Reels, TikTok and Facebook Reels**. The same original 9:16 video can be prepared for each network, with separate account labels, manual performance metrics and earnings tracked by platform.
 
@@ -22,6 +22,14 @@ The private repo includes cloud rendering, expressive AI voice synthesis, origin
 ## Windows fallback
 
 If you prefer the local version, download the release ZIP from https://github.com/dclipsentertainment/shorts-studio-app/releases/latest, extract once, and open `OPEN-DASHBOARD.cmd`. The launcher checks for new releases and updates itself without Git or administrator access.
+
+## Easier editing (v0.14.5)
+
+- One-click **Remove AI commentary** while keeping the original clip soundtrack when it exists.
+- Overwrite any timed caption or headline using the editor's text box.
+- **Drag the on-screen text** or enter X/Y positions; save placement with the render job and final MP4.
+- The position currently applies to the whole caption track; individual wording/timing remains editable.
+- [Caption editor and copyright guidance](README-CAPTION-EDITOR.md).
 
 ## Two creative modes
 
