@@ -6,7 +6,7 @@
 const STORE_KEY = 'shorts_studio_state_v1';
 const RECOVERY_KEY = 'shorts_studio_recovery_v1';
 const APP_VERSION = '0.14.7';
-const views = {overview:'Overview',channels:'Channels',production:'Production flow',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',live:'Live stream monitor',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',usage:'GitHub usage',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
+const views = {overview:'Overview',channels:'Channels',production:'Production flow',series:'Story series planner',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',live:'Live stream monitor',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',usage:'GitHub usage',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
 const palettes = ['#8c7aff','#ef7ab6','#50bdc3','#e9a868','#5abb92','#6b95f1'];
 const initial = () => ({version:1,channels:[],projects:[],scoutReports:[],trends:[],discovery:null,streamers:[],viralThreshold:100000,createdAt:new Date().toISOString(),demo:false});
 const $ = s => document.querySelector(s);
@@ -23,6 +23,8 @@ let page = (location.hash.replace('#','') in views) ? location.hash.slice(1) : '
 let filter = 'all';
 let discoveryNiche='all';
 let aiDraft = null;
+let seriesDraft = null;
+let seriesPreview = null;
 let aiBrief = null;
 let aiPrefill = null;
 let previewProjectId = '';
@@ -79,7 +81,7 @@ function render(){
  $('#today-date').textContent=new Date().toLocaleDateString('en-IE',{weekday:'short',day:'numeric',month:'short'});
  $('#crumb-current').textContent=views[page];
  document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===page));
- const main=$('#main');main.innerHTML=({overview:overview,channels:channelsPage,production:productionPage,studio:studioPage,queue:queuePage,scout:scoutPage,live:liveMonitorPage,radar:radarPage,discover:discoverPage,analytics:analyticsPage,usage:window.DClipsUsageMonitor.render,growth:growthPage,creative:creativePage,ai:aiDeskPage,preview:previewPage,quality:qualityPage,competitors:competitorsPage,setup:setupPage}[page])();
+ const main=$('#main');main.innerHTML=({overview:overview,channels:channelsPage,production:productionPage,series:seriesPage,studio:studioPage,queue:queuePage,scout:scoutPage,live:liveMonitorPage,radar:radarPage,discover:discoverPage,analytics:analyticsPage,usage:window.DClipsUsageMonitor.render,growth:growthPage,creative:creativePage,ai:aiDeskPage,preview:previewPage,quality:qualityPage,competitors:competitorsPage,setup:setupPage}[page])();
  if(page==='usage')window.DClipsUsageMonitor.afterRender();
  if(page==='preview')previewRestoreDisplay();
  if(page==='production'){productionRestoreDisplay();productionCheckBackend();}
@@ -109,6 +111,105 @@ function channelsPage(){return `${heading('BRANDS & ACCOUNTS','Your channels','M
  <div class="notice" style="margin-bottom:21px">Names and @handles are planning information only. Entering a handle does <strong>not</strong> connect an account or enable publishing. OAuth integration comes later.</div>
  ${state.channels.length?`<div class="channel-grid">${state.channels.map(channelCard).join('')}</div>`:empty('◎','No channel groups yet','Create one brand for each type of content.','Create a channel','new-channel')}
  <h2 class="section-title">Recommended structure</h2><div class="panel"><p class="secondary-note">Use one content brand across YouTube Shorts, Instagram Reels, TikTok and Facebook Reels. Keep each platform handle and performance figure separate; publishing rights and monetisation eligibility vary by platform.</p></div>`}
+
+function seriesPage(){
+ const defaults={title:'',script:'',wpm:145,channelId:state.channels[0]?.id||'',
+  enabled:{IG:true,YT:true,TT:true,FB:true},conf:{}};
+ const d=seriesDraft||defaults,profiles=window.DClipsSeries?.PROFILES||{};
+ return `${heading('MULTI-PLATFORM NARRATIVE','Story series planner','Write one complete story, then plan different-length episodes for Instagram, YouTube Shorts, TikTok and Facebook.')}
+ <div class="notice" style="margin-bottom:18px">These are editorial length recommendations, not guaranteed reach, revenue or eligibility. Creating drafts does not render or post anything. Add illustrations and approve all parts before exporting.</div>
+ <section class="panel series-editor"><div class="panel-head"><h2>1. Your complete story</h2><span class="tiny-muted">MASTER SCRIPT</span></div>
+ <div class="form-grid">
+ <div class="form-field span2"><label for="series-title">Story title</label><input class="field" id="series-title" value="${esc(d.title)}" maxlength="150" placeholder="The Life of Julius Caesar"></div>
+ <div class="form-field span2"><label for="series-script">Narration script</label><textarea class="field" id="series-script" rows="10" maxlength="45000" placeholder="Write the complete story in chronological order…">${esc(d.script)}</textarea><div class="field-help">Parts use approximate sentence boundaries. Review the cuts, improve every opening hook and ensure each part feels complete.</div></div>
+ <div class="form-field"><label for="series-wpm">Narrator speed (words/minute)</label><input class="field" id="series-wpm" type="number" min="100" max="200" step="5" value="${Number(d.wpm)||145}"></div>
+ <div class="form-field"><label for="series-channel">Your DClips brand</label><select class="field" id="series-channel">${state.channels.length?state.channels.map(ch=>`<option value="${esc(ch.id)}" ${ch.id===(d.channelId||state.channels[0]?.id)?'selected':''}>${esc(ch.name)}</option>`).join(''):'<option value="">Create a brand first</option>'}</select></div>
+ </div></section>
+ <section class="panel" style="margin-top:18px"><div class="panel-head"><h2>2. Platform-specific episode lengths</h2><span class="tiny-muted">EDITABLE RECOMMENDATIONS</span></div>
+ <div class="series-platform-grid">${Object.keys(profiles).map(id=>{
+  const p=profiles[id],enabled=d.enabled?.[id]!==false,conf=d.conf?.[id]||{};
+  const mode=conf.mode||p.mode,target=Number(conf.target||p.target);
+  return `<div class="series-platform"><label class="checkbox-row"><input type="checkbox" id="series-enabled-${id}" ${enabled?'checked':''}> <strong>${esc(p.name)}</strong></label>
+   <div class="form-field"><label for="series-mode-${id}">Format</label><select class="field" id="series-mode-${id}"><option value="parts" ${mode==='parts'?'selected':''}>Short parts</option><option value="full" ${mode==='full'?'selected':''}>Complete story where possible</option></select></div>
+   <div class="form-field"><label for="series-target-${id}">Target seconds</label><input class="field" id="series-target-${id}" type="number" min="15" max="${p.max}" step="5" value="${target}"></div>
+   <p class="tiny-muted"><strong>Suggested: ${esc(p.recommended)}</strong>. ${esc(p.why)}</p>
+  </div>`;
+ }).join('')}</div>
+ <div class="preview-actions"><button type="button" class="button button-ghost" data-action="series-example">Load sample Caesar outline</button><button type="button" class="button button-primary" data-action="series-preview">✦ Recommend story parts</button></div></section>
+ ${seriesPreview?`<section class="panel" style="margin-top:18px"><div class="panel-head"><h2>3. Review the proposed episodes</h2><span class="tiny-muted">${num(seriesPreview.words)} WORDS · ≈ ${Math.round(seriesPreview.estimatedSeconds/6)/10} MINUTES</span></div>
+ <div class="notice warn">These are estimated cuts, not finished scripts. Edit each part for smooth transitions, a strong opening, accurate narration and scene illustrations before publishing.</div>
+ ${seriesPreview.platforms.map(v=>`<div class="series-variant"><h3>${esc(v.name)} · ${v.partCount} ${v.partCount===1?'video':'parts'} <span class="tiny-muted">${v.mode==='full'?'Full-story preference':'Short episodes'} · target ${v.target}s</span></h3>
+ <div class="series-parts">${v.parts.map(part=>`<article class="series-part"><div><strong>${esc(part.label)}</strong><small>≈ ${part.seconds} sec · ${part.words} words</small></div><p>${esc(part.script.slice(0,185))}${part.script.length>185?'…':''}</p></article>`).join('')}</div>
+ ${v.warnings.map(x=>`<p class="review-error">⚠ ${esc(x)}</p>`).join('')}</div>`).join('')}
+ <button type="button" class="button button-primary" data-action="series-create">＋ Create ${seriesPreview.platforms.reduce((sum,v)=>sum+v.partCount,0)} editable video drafts</button>
+ <p class="footnote">Each part is saved as a separate draft with its target platform and episode number. The full master script remains in the series record. Nothing is automatically uploaded.</p></section>`:''}
+ <section class="panel" style="margin-top:18px"><h2>Saved story series · ${(state.seriesPlans||[]).length}</h2>
+ ${(state.seriesPlans||[]).length?(state.seriesPlans||[]).slice(-8).reverse().map(x=>`<div class="metric-list"><span><strong>${esc(x.title)}</strong><small>${esc(dateStr(x.createdAt))} · ${x.projectCount} video drafts</small></span><button class="button tiny" data-action="series-show-drafts" data-id="${esc(x.id)}">Open drafts</button></div>`).join(''):'<p class="secondary-note">Create your first story series above to see its episodes in Content Studio.</p>'}</section>`;
+}
+function seriesReadForm(){
+ if(!window.DClipsSeries)throw Error('Story planner module is missing; reload the latest DClips app.');
+ const ids=Object.keys(window.DClipsSeries.PROFILES),enabled={},conf={},platforms=[];
+ for(const id of ids){
+  enabled[id]=Boolean($('#series-enabled-'+id)?.checked);
+  conf[id]={mode:$('#series-mode-'+id)?.value||window.DClipsSeries.PROFILES[id].mode,
+    target:Number($('#series-target-'+id)?.value||window.DClipsSeries.PROFILES[id].target)};
+  if(enabled[id])platforms.push(id);
+ }
+ const draft={title:($('#series-title')?.value||'').trim(),script:($('#series-script')?.value||'').trim(),
+  wpm:Number($('#series-wpm')?.value||145),channelId:$('#series-channel')?.value||'',enabled,conf};
+ return {draft,plan:window.DClipsSeries.plan({...draft,platforms,config:conf})};
+}
+function seriesPreviewAction(){
+ try{const data=seriesReadForm();seriesDraft=data.draft;seriesPreview=data.plan;render();
+  notice('Story recommendations ready. Check the cuts before creating projects.');
+ }catch(e){notice(e.message)}
+}
+function seriesExample(){
+ const script='Julius Caesar was born into a patrician family in ancient Rome. His early life unfolded amid political instability and rivalries. He later developed a military and political career that brought him increasing influence. In Gaul, his campaigns greatly expanded Roman power, but also intensified political tension at home. When he crossed the Rubicon in forty-nine BCE, he started a civil war against rivals including Pompey. His victory left him with extraordinary authority. In forty-four BCE, a group of senators assassinated Caesar. Their actions did not restore the old Republic. Instead, more civil wars followed, helping pave the way for the Roman Empire.';
+ seriesDraft={title:'The Life of Julius Caesar',script,wpm:145,channelId:state.channels[0]?.id||'',
+  enabled:{IG:true,YT:true,TT:true,FB:true},conf:{}};seriesPreview=null;render();
+ notice('Sample outline loaded. Expand it and fact-check the script before publication.');
+}
+function seriesCreate(){
+ try{
+  const {draft,plan}=seriesReadForm();
+  if(!state.channels.some(ch=>ch.id===draft.channelId))throw Error('Create and select a channel before saving story drafts.');
+  const count=plan.platforms.reduce((n,v)=>n+v.partCount,0);
+  if(count>80)throw Error('This plan has more than 80 drafts. Choose fewer platforms or split the master story into chapters.');
+  if((state.seriesPlans||[]).length>=35)throw Error('Maximum 35 saved series. Back up your workspace before adding more.');
+  const seriesId=uid(),now=new Date().toISOString(),projects=[];
+  for(const variant of plan.platforms){
+   for(const part of variant.parts){
+    const duration=Math.max(8,Math.min(600,Math.ceil(part.seconds+2.5)));
+    projects.push({id:uid(),title:part.label,kind:'original',channelId:draft.channelId,status:'draft',
+     script:part.script,description:'',notes:'Part of '+draft.title+'; '+variant.name+
+      '. Review individual hook, facts and illustration sequence. This is a draft, not publish-ready.',
+     duration,start:0,sourcePath:'',sourceUrl:'',voiceMode:'kokoro',voiceName:'am_michael',
+     captionStyle:'kinetic',captionX:50,captionY:75,visualMode:'illustrated',visualTheme:'cosmos',
+     visualTransition:'fade',visualScenes:[],rights:false,timedCaptions:'',
+     series:{id:seriesId,title:draft.title,platform:variant.id,part:part.number,total:part.total,estimatedSeconds:part.seconds},
+     createdAt:now,updatedAt:now});
+   }
+  }
+  const record={id:seriesId,title:draft.title,masterScript:draft.script,wpm:draft.wpm,
+   channelId:draft.channelId,createdAt:now,projectCount:projects.length,
+   variants:plan.platforms.map(v=>({platform:v.id,mode:v.mode,count:v.partCount,target:v.target}))};
+  state.projects.push(...projects);if(!Array.isArray(state.seriesPlans))state.seriesPlans=[];
+  state.seriesPlans.push(record);
+  if(!save()){
+   state.projects.splice(state.projects.length-projects.length,projects.length);state.seriesPlans.pop();
+   throw Error('Could not save series in browser storage. Export a backup.');
+  }
+  seriesPreview=null;seriesDraft=null;navigate('studio');
+  notice('Created '+projects.length+' video drafts. Add pictures, verify rights and review every script before rendering.');
+ }catch(e){notice(e.message)}
+}
+function seriesShowDrafts(id){
+ const item=(state.seriesPlans||[]).find(x=>x.id===id);if(!item)return;
+ const found=state.projects.filter(p=>p.series?.id===id);
+ if(!found.length){notice('These series drafts have already been removed.');return}
+ navigate('studio');notice(found.length+' saved drafts belong to '+item.title+'.');
+}
 function liveMonitorPage(){
  const watchers=state.streamers||[];
  const url=w=>(w.platform==='twitch'?'https://www.twitch.tv/':w.platform==='kick'?'https://kick.com/':'https://www.youtube.com/@')+encodeURIComponent(w.handle);
@@ -1355,7 +1456,7 @@ function productionApprove(){
 function productionExport(){try{const p=productionDraftSave();const blockers=renderBlockers(p);if(blockers.length)throw Error(blockers.join(' · '));downloadJSON(`production-${p.id}.json`,createRenderJob(p));notice('Render job exported. Actual MP4 requires Python/FFmpeg or GitHub later.')}catch(e){notice(e.message)}}
 
 function handleClick(ev){let nav=ev.target.closest('[data-nav]');if(nav){navigate(nav.dataset.nav);return}let btn=ev.target.closest('[data-action]');if(!btn)return;let action=btn.dataset.action,id=btn.dataset.id;
- switch(action){case 'production-approve':productionApprove();break;case 'live-plan':livePlan(id);break;case 'live-delete':state.streamers=(state.streamers||[]).filter(w=>w.id!==id);save();render();notice('Streamer removed.');break;case 'production-remove-commentary':productionRemoveCommentary();break;case 'production-apply-text':productionApplyText();break;case 'production-center-text':moveTextInput('production',true);break;case 'production-play':productionPlayStoryboard();break;case 'production-stop':productionStopStoryboard();break;case 'production-save':productionSave();break;case 'production-estimate':productionEstimate();break;case 'production-upload-video':productionUpload('file');break;case 'production-upload-audio':productionUpload('audio');break;case 'production-demo':productionDemo();break;case 'production-auto-scenes':productionAutoScenes();break;case 'production-upload-scene':productionUploadScene();break;case 'production-generated':productionGenerated();break;case 'production-transcribe':productionTranscribe();break;case 'production-import-cues':$('#production-cue-file')?.click();break;case 'production-add-cue':{const t=productionCues.at(-1)?.end_seconds||0;const len=Number($('#production-length')?.value)||30;if(t<len-.1){productionCues.push({start_seconds:t,end_seconds:Math.min(t+1.5,len),text:'New caption'});productionPaint()}break;}case 'production-remove-cue':productionCues.splice(Number(btn.dataset.index),1);productionPaint();break;case 'production-seek':{const vid=$('#production-video');const cue=productionCues[Number(btn.dataset.index)];if(vid&&cue)vid.currentTime=(Number($('#production-start')?.value)||0)+cue.start_seconds;break;}case 'production-render':productionRender();break;case 'production-export':productionExport();break;case 'new-channel':openChannel();break;case 'edit-channel':openChannel(id);break;case 'new-content':openProject(null,{channelId:btn.dataset.channel,kind:btn.dataset.kind});break;case 'edit-content':openProject(id);break;case 'preview-project':previewSelectProject(id);navigate('preview');break;case 'preview-demo':previewDemo();break;case 'preview-add':previewAddCue();break;case 'preview-seek-start':{let v=$('#preview-video');if(v&&v.readyState)v.currentTime=previewStart();break;}case 'preview-jump':{let v=$('#preview-video'),c=previewSegments[Number(btn.dataset.index)];if(v?.readyState&&c)v.currentTime=previewStart()+c.start_seconds;break;}case 'preview-remove':previewSegments.splice(Number(btn.dataset.index),1);previewPaintCues();break;case 'preview-apply-text':previewApplyText();break;case 'preview-center-text':moveTextInput('preview',true);break;case 'preview-remove-voice':previewRemoveCommentary();break;case 'preview-save':previewSave();break;case 'preview-export-srt':previewExportSRT();break;case 'preview-export-json':previewExportJSON();break;case 'preview-export-job':{if(previewProject())jobExport(previewProjectId);break;}case 'close-modal':$('#modal').close();break;case 'go-studio':navigate('studio');break;case 'export-job':jobExport(id);break;case 'export-batch':exportRenderBatch();break;case 'restore-recovery':restoreRecovery(Number(btn.dataset.index));break;case 'backup':downloadJSON(`shorts-studio-backup-${new Date().toISOString().slice(0,10)}.json`,state);notice('Backup downloaded.');break;case 'import':$('#import-file').click();break;case 'import-scout':$('#scout-file').click();break;case 'import-trends':$('#trend-file').click();break;case 'import-discovery':$('#discovery-file').click();break;case 'export-discovery':if(state.discovery)downloadJSON('youtube-discovery-ranked.json',state.discovery);break;case 'track-discovery':trackDiscovery(id);break;case 'idea-discovery':trackDiscovery(id,true);break;case 'new-trend':openTrend();break;case 'edit-trend':openTrend(id);break;case 'delete-trend':deleteTrend(id);break;case 'idea-trend':ideaTrend(id);break;case 'export-trends':exportTrends();break;case 'export-growth':exportGrowth();break;case 'add-candidate':addCandidate(id,Number(btn.dataset.index));break;case 'demo':doDemo();break;case 'reset':if(confirm('Delete all channels, projects, trend watchlists and manual stats in this browser? This cannot be undone.')){state=initial();save();render();notice('Local workspace reset.')}break;case 'delete-channel':if(confirm('Delete this channel and all its projects?')){state.channels=state.channels.filter(x=>x.id!==id);state.projects=state.projects.filter(x=>x.channelId!==id);$('#modal').close();save();render()}break;case 'delete-project':if(confirm('Delete this project?')){state.projects=state.projects.filter(x=>x.id!==id);$('#modal').close();save();render()}break;case 'script-starter':suggestScript();break;case 'generate-concept':generateConcept();break;case 'ai-load-project':loadAiProject();break;case 'ai-existing':{if($('#modal').open)$('#modal').close();let p=state.projects.find(x=>x.id===id);aiPrefill=p?{topic:p.title,angle:(p.notes||'').slice(0,600),mode:p.kind,channelId:p.channelId,projectId:p.id}:null;navigate('ai');break;}case 'ai-build-prompt':buildAiPrompt();break;case 'ai-copy-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)copyText(t);break;}case 'ai-download-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)downloadText('chatgpt-shorts-prompt.txt',t);break;}case 'ai-preview':previewAiReply();break;case 'ai-save-draft':saveAiDraft();break;case 'ai-import-file':$('#ai-file').click();break;case 'save-concept':saveConcept(Number(btn.dataset.index));break;case 'copy-caption':{let p=state.projects.find(x=>x.id===id);if(p)copyText([p.ytTitle||p.title,p.description].filter(Boolean).join('\n\n'));break;}}
+ switch(action){case 'series-preview':seriesPreviewAction();break;case 'series-create':seriesCreate();break;case 'series-example':seriesExample();break;case 'series-show-drafts':seriesShowDrafts(id);break;case 'production-approve':productionApprove();break;case 'live-plan':livePlan(id);break;case 'live-delete':state.streamers=(state.streamers||[]).filter(w=>w.id!==id);save();render();notice('Streamer removed.');break;case 'production-remove-commentary':productionRemoveCommentary();break;case 'production-apply-text':productionApplyText();break;case 'production-center-text':moveTextInput('production',true);break;case 'production-play':productionPlayStoryboard();break;case 'production-stop':productionStopStoryboard();break;case 'production-save':productionSave();break;case 'production-estimate':productionEstimate();break;case 'production-upload-video':productionUpload('file');break;case 'production-upload-audio':productionUpload('audio');break;case 'production-demo':productionDemo();break;case 'production-auto-scenes':productionAutoScenes();break;case 'production-upload-scene':productionUploadScene();break;case 'production-generated':productionGenerated();break;case 'production-transcribe':productionTranscribe();break;case 'production-import-cues':$('#production-cue-file')?.click();break;case 'production-add-cue':{const t=productionCues.at(-1)?.end_seconds||0;const len=Number($('#production-length')?.value)||30;if(t<len-.1){productionCues.push({start_seconds:t,end_seconds:Math.min(t+1.5,len),text:'New caption'});productionPaint()}break;}case 'production-remove-cue':productionCues.splice(Number(btn.dataset.index),1);productionPaint();break;case 'production-seek':{const vid=$('#production-video');const cue=productionCues[Number(btn.dataset.index)];if(vid&&cue)vid.currentTime=(Number($('#production-start')?.value)||0)+cue.start_seconds;break;}case 'production-render':productionRender();break;case 'production-export':productionExport();break;case 'new-channel':openChannel();break;case 'edit-channel':openChannel(id);break;case 'new-content':openProject(null,{channelId:btn.dataset.channel,kind:btn.dataset.kind});break;case 'edit-content':openProject(id);break;case 'preview-project':previewSelectProject(id);navigate('preview');break;case 'preview-demo':previewDemo();break;case 'preview-add':previewAddCue();break;case 'preview-seek-start':{let v=$('#preview-video');if(v&&v.readyState)v.currentTime=previewStart();break;}case 'preview-jump':{let v=$('#preview-video'),c=previewSegments[Number(btn.dataset.index)];if(v?.readyState&&c)v.currentTime=previewStart()+c.start_seconds;break;}case 'preview-remove':previewSegments.splice(Number(btn.dataset.index),1);previewPaintCues();break;case 'preview-apply-text':previewApplyText();break;case 'preview-center-text':moveTextInput('preview',true);break;case 'preview-remove-voice':previewRemoveCommentary();break;case 'preview-save':previewSave();break;case 'preview-export-srt':previewExportSRT();break;case 'preview-export-json':previewExportJSON();break;case 'preview-export-job':{if(previewProject())jobExport(previewProjectId);break;}case 'close-modal':$('#modal').close();break;case 'go-studio':navigate('studio');break;case 'export-job':jobExport(id);break;case 'export-batch':exportRenderBatch();break;case 'restore-recovery':restoreRecovery(Number(btn.dataset.index));break;case 'backup':downloadJSON(`shorts-studio-backup-${new Date().toISOString().slice(0,10)}.json`,state);notice('Backup downloaded.');break;case 'import':$('#import-file').click();break;case 'import-scout':$('#scout-file').click();break;case 'import-trends':$('#trend-file').click();break;case 'import-discovery':$('#discovery-file').click();break;case 'export-discovery':if(state.discovery)downloadJSON('youtube-discovery-ranked.json',state.discovery);break;case 'track-discovery':trackDiscovery(id);break;case 'idea-discovery':trackDiscovery(id,true);break;case 'new-trend':openTrend();break;case 'edit-trend':openTrend(id);break;case 'delete-trend':deleteTrend(id);break;case 'idea-trend':ideaTrend(id);break;case 'export-trends':exportTrends();break;case 'export-growth':exportGrowth();break;case 'add-candidate':addCandidate(id,Number(btn.dataset.index));break;case 'demo':doDemo();break;case 'reset':if(confirm('Delete all channels, projects, trend watchlists and manual stats in this browser? This cannot be undone.')){state=initial();save();render();notice('Local workspace reset.')}break;case 'delete-channel':if(confirm('Delete this channel and all its projects?')){state.channels=state.channels.filter(x=>x.id!==id);state.projects=state.projects.filter(x=>x.channelId!==id);$('#modal').close();save();render()}break;case 'delete-project':if(confirm('Delete this project?')){state.projects=state.projects.filter(x=>x.id!==id);$('#modal').close();save();render()}break;case 'script-starter':suggestScript();break;case 'generate-concept':generateConcept();break;case 'ai-load-project':loadAiProject();break;case 'ai-existing':{if($('#modal').open)$('#modal').close();let p=state.projects.find(x=>x.id===id);aiPrefill=p?{topic:p.title,angle:(p.notes||'').slice(0,600),mode:p.kind,channelId:p.channelId,projectId:p.id}:null;navigate('ai');break;}case 'ai-build-prompt':buildAiPrompt();break;case 'ai-copy-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)copyText(t);break;}case 'ai-download-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)downloadText('chatgpt-shorts-prompt.txt',t);break;}case 'ai-preview':previewAiReply();break;case 'ai-save-draft':saveAiDraft();break;case 'ai-import-file':$('#ai-file').click();break;case 'save-concept':saveConcept(Number(btn.dataset.index));break;case 'copy-caption':{let p=state.projects.find(x=>x.id===id);if(p)copyText([p.ytTitle||p.title,p.description].filter(Boolean).join('\n\n'));break;}}
 }
 // Drag caption text directly on the video. Save coordinates with each project's final render job.
 document.addEventListener('pointerdown',ev=>{
