@@ -143,7 +143,16 @@
      throw Error('Your browser cannot unpack compressed ZIPs. Extract the ZIP and select all images instead.');
     try{
      const input=new Blob([payload]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
-     raw=new Uint8Array(await new Response(input).arrayBuffer());
+     const reader=input.getReader(),chunks=[];let seen=0;
+     try{
+      while(true){
+       const step=await reader.read();if(step.done)break;
+       seen+=step.value.length;
+       if(seen>uncompressed||seen>MAX_IMAGE)throw Error('ZIP image decompressed beyond its declared safe size.');
+       chunks.push(step.value);
+      }
+     }catch(err){await reader.cancel().catch(()=>{});throw err;}
+     raw=concat(chunks);
     }catch(_){throw Error('Could not decompress ZIP images. Extract the ZIP and select images instead.');}
    }
    if(raw.length!==uncompressed||crc32(raw)!==crc||detect(raw)!==(ext==='jpeg'?'jpg':ext))
