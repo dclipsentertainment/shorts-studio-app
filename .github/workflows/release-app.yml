@@ -32,6 +32,8 @@ jobs:
       - name: Sanity-check application code
         run: |
           node --check app.js
+          node --check asmr.js
+          node scripts/test_asmr_ui.js
           node --check story-series.js
           node --check quick-create.js
           node scripts/test_quick_create.js
