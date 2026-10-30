@@ -80,6 +80,82 @@
   write32(end,centralBytes.length,12);write32(end,offset,16);
   return concat([...local,centralBytes,end]);
  }
+
+ // Open ZIP image packs entirely in the browser. Accept the stored and normal
+ // deflated ZIP formats; never trust archive filenames or claimed sizes.
+ async function imagesFromArchive(file){
+  if(!file||!/\.(zip)$/i.test(file.name||'')||!Number.isFinite(file.size)||
+     file.size<22||file.size>42*1024*1024)
+   throw Error('Choose an image ZIP smaller than 42 MiB.');
+  const bytes=new Uint8Array(await file.arrayBuffer());
+  const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
+  const u16=i=>view.getUint16(i,true),u32=i=>view.getUint32(i,true);
+  if(u32(0)!==0x04034b50)throw Error('This is not a ZIP archive.');
+  let eocd=-1;
+  for(let p=bytes.length-22;p>=Math.max(0,bytes.length-65557);p--){
+   if(u32(p)===0x06054b50&&p+22+u16(p+20)===bytes.length){eocd=p;break;}
+  }
+  if(eocd<0)throw Error('ZIP has no valid central directory.');
+  const count=u16(eocd+10),size=u32(eocd+12),offset=u32(eocd+16);
+  if(u16(eocd+4)||u16(eocd+6)||u16(eocd+8)!==count||
+     count<1||count>16||size===0xffffffff||offset===0xffffffff||offset+size>eocd)
+   throw Error('ZIP entry count or directory is unsupported.');
+  const decoder=new TextDecoder('utf-8',{fatal:true});
+  let cursor=offset,total=0;const result=[],names=new Set();
+  for(let index=0;index<count;index++){
+   if(cursor+46>bytes.length||u32(cursor)!==0x02014b50)throw Error('Invalid ZIP directory entry.');
+   const flags=u16(cursor+8),method=u16(cursor+10),crc=u32(cursor+16),
+    compressed=u32(cursor+20),uncompressed=u32(cursor+24),
+    nameLength=u16(cursor+28),extraLength=u16(cursor+30),commentLength=u16(cursor+32),
+    external=u32(cursor+38),local=u32(cursor+42);
+   const end=cursor+46+nameLength+extraLength+commentLength;
+   if(end>bytes.length||compressed===0xffffffff||uncompressed===0xffffffff||
+      (flags&1)||!([0,8].includes(method))||local>=offset)
+    throw Error('ZIP contains an unsupported or encrypted entry.');
+   const mode=external>>>16;
+   if((mode&0xf000)===0xa000)throw Error('ZIP symbolic links are not allowed.');
+   const entryName=decoder.decode(bytes.subarray(cursor+46,cursor+46+nameLength));
+   cursor=end;
+   if(entryName.endsWith('/'))continue;
+   if(entryName.startsWith('/')||entryName.includes('\\')||
+      entryName.split('/').some(x=>!x||x==='.'||x==='..')||entryName.split('/').length>3)
+    throw Error('ZIP contains unsafe filenames.');
+   const basename=entryName.split('/').at(-1);
+   const ext=extension(basename);
+   if(!ext)throw Error('Image ZIP can only contain PNG, JPG or WebP images.');
+   if(names.has(basename.toLowerCase()))throw Error('Two ZIP images have the same filename.');
+   names.add(basename.toLowerCase());
+   if(uncompressed<17||uncompressed>MAX_IMAGE||compressed>MAX_IMAGE||total+uncompressed>MAX_TOTAL)
+    throw Error('ZIP pictures exceed the image size allowance.');
+   if(local+30>bytes.length||u32(local)!==0x04034b50)throw Error('Invalid ZIP local image header.');
+   const localFlags=u16(local+6),localMethod=u16(local+8),
+     localNameLength=u16(local+26),localExtraLength=u16(local+28);
+   if(localFlags!==flags||localMethod!==method||local+30+localNameLength+localExtraLength+compressed>offset)
+    throw Error('ZIP image header does not match directory.');
+   const localName=decoder.decode(bytes.subarray(local+30,local+30+localNameLength));
+   if(localName!==entryName)throw Error('ZIP image filename mismatch.');
+   const start=local+30+localNameLength+localExtraLength;
+   const payload=bytes.subarray(start,start+compressed);
+   let raw;
+   if(method===0){raw=new Uint8Array(payload);}
+   else{
+    if(typeof DecompressionStream!=='function')
+     throw Error('Your browser cannot unpack compressed ZIPs. Extract the ZIP and select all images instead.');
+    try{
+     const input=new Blob([payload]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+     raw=new Uint8Array(await new Response(input).arrayBuffer());
+    }catch(_){throw Error('Could not decompress ZIP images. Extract the ZIP and select images instead.');}
+   }
+   if(raw.length!==uncompressed||crc32(raw)!==crc||detect(raw)!==(ext==='jpeg'?'jpg':ext))
+    throw Error('An image in the ZIP failed its integrity or format check.');
+   total+=raw.length;
+   result.push(new File([raw],basename,{type:ext==='png'?'image/png':ext==='webp'?'image/webp':'image/jpeg'}));
+  }
+  if(cursor!==offset+size||result.length<1||result.length>8)
+   throw Error('An image ZIP must contain 1–8 valid pictures and no other files.');
+  return result;
+ }
+
  function detect(bytes){
   if(bytes.length>=8&&[137,80,78,71,13,10,26,10].every((b,i)=>bytes[i]===b))return 'png';
   if(bytes.length>=3&&bytes[0]===255&&bytes[1]===216&&bytes[2]===255)return 'jpg';
@@ -116,5 +192,5 @@
   entries.unshift({name:'render-job.json',data:jobBytes});
   return zip(entries);
  }
- return {assign,packageJob,zip,detect,MAX_IMAGE,MAX_TOTAL};
+ return {assign,packageJob,imagesFromArchive,zip,detect,MAX_IMAGE,MAX_TOTAL};
 });
