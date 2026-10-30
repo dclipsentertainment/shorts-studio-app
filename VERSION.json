@@ -1,6 +1,6 @@
 {
-  "version": "0.14.6",
+  "version": "0.14.7",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "Phase 1 video quality: consistent renderer, local MP4 technical QA, final playback and rights approval, review invalidation after edits, owned-clip end-to-end smoke tests"
+  "notes": "A/B video quality comparison, editable speech-timed caption sidecars, synced cloud/local renderer, review-status Quality Gate and fresh-render approval fix"
 }
