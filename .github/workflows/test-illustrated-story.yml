@@ -6,6 +6,9 @@ on:
       - scripts/storyboard.py
       - scripts/render.py
       - scripts/test_illustrated_story.py
+      - scripts/test_illustrated_ui.js
+      - app.js
+      - styles.css
       - .github/workflows/test-illustrated-story.yml
 permissions:
   contents: read
@@ -30,5 +33,6 @@ jobs:
       - name: Validate dashboard
         run: |
           node --check app.js
+          node scripts/test_illustrated_ui.js
           node scripts/test_caption_ui.js
           node scripts/test_review_gate.js
