@@ -22,8 +22,8 @@ This workflow runs from the **online DClips dashboard**, even without a graphics
 1. The **private** GitHub upload page should already be open. If your browser blocked the tab, open https://github.com/dclipsentertainment/shorts-studio-production/upload/main manually.
 2. Click **Add file → Upload files**, choose the newly downloaded `cloud-render-....zip`, then **Commit changes** to `main`. One ZIP per commit. **Never upload this ZIP to your public DClips app repository.**
 3. In **Actions**, open **Render uploaded DClips video** (it starts automatically after the upload). GitHub renders the illustrations, narration, subtitles and transitions.
-4. Open the completed workflow run and download **finished-online-video** in its Artifacts section. Extract the artifact ZIP to obtain the MP4 and technical quality report.
-5. Return to **Production flow**, choose **Review the finished cloud video**, select the MP4 and watch it. For a story-series episode, watching the full MP4 unlocks the controls to revise number of parts and target duration. The uploaded MP4 stays in your browser; it is not posted.
+4. Open the completed workflow run and download **finished-online-video** in its Artifacts section. You can download the artifact ZIP and select it **directly in DClips** to view the MP4, without extracting it. DClips also accepts an already-extracted MP4. The technical quality report remains inside the ZIP for inspection.
+5. Return to **Production flow**, choose **Review the finished cloud video**, select the downloaded **finished-online-video.zip** (or its MP4) and watch it. For a story-series episode, watching the full MP4 unlocks the controls to revise number of parts and target duration. The uploaded MP4 stays in your browser; it is not posted.
 
 ## Security and quality
 
