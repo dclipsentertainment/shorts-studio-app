@@ -31,6 +31,8 @@ let previewUrl = '';
 let previewObjectUrl = '';
 let previewMediaName = '';
 let previewFileDuration = 0;
+let previewEditingCueIndex = -1;
+let captionDragging = null;
 let toastTimer;
 function load(){try{let item=JSON.parse(localStorage.getItem(STORE_KEY)); if(item && item.version === 1 && Array.isArray(item.channels) && Array.isArray(item.projects)) return item;}catch(err){console.warn('Could not load local data:',err)}return initial()}
 function recoveryEntries(){
@@ -285,8 +287,19 @@ function previewPage(){
  <div class="studio-layout preview-layout"><section class="panel">
   <div class="panel-head"><h2>Video preview</h2><span class="tiny-muted">9:16 safe-area guide</span></div>
   <div class="form-field"><label for="preview-project">Project</label><select id="preview-project" class="field"><option value="">Choose a project</option>${state.projects.map(x=>`<option value="${esc(x.id)}" ${x.id===current?.id?'selected':''}>${esc(x.title)}</option>`).join('')}</select></div>
-  <div class="preview-stage"><video id="preview-video" preload="metadata" controls playsinline></video><div id="preview-caption" class="preview-caption" aria-live="off"></div><div class="preview-safe">VERTICAL OUTPUT · 9:16</div><div id="preview-placeholder" class="preview-placeholder">Choose a local video or load the included sample</div></div>
+  <div class="preview-stage" id="preview-stage"><video id="preview-video" preload="metadata" controls playsinline></video><div id="preview-caption" class="preview-caption" role="button" tabindex="0" aria-label="Drag caption to move it" title="Drag to move caption" aria-live="off"></div><div class="preview-safe">VERTICAL OUTPUT · 9:16</div><div id="preview-placeholder" class="preview-placeholder">Choose a local video or load the included sample</div></div>
   <div class="preview-actions"><label class="button button-ghost small preview-file-button" for="preview-file">＋ Select video<input id="preview-file" type="file" accept="video/*" hidden></label><button class="button button-ghost small" data-action="preview-demo">▶ Demo video</button><button class="button small" data-action="preview-seek-start">↶ Go to start</button></div>
+  <div class="panel caption-edit-panel" style="margin:12px 0"><h3>Caption and commentary editor</h3>
+   <p class="secondary-note">Play or seek to the caption you want to change. Overwrite the text below, then drag the text on the video to position it. The position applies to all captions in this project and the final MP4.</p>
+   <div class="form-field"><label for="preview-overlay-mode">Text display</label><select class="field" id="preview-overlay-mode">
+    ${[['classic','Classic subtitles'],['word-pop','Word-pop'],['kinetic','Kinetic'],['hook','Headline at top only'],['none','No on-screen text']].map(([key,label])=>`<option value="${key}" ${(current?.captionStyle||'classic')===key?'selected':''}>${label}</option>`).join('')}
+   </select></div>
+   <div class="form-field"><label for="preview-caption-text">Overwrite the current caption / headline</label><textarea class="field" id="preview-caption-text" rows="2" maxlength="160" placeholder="Select a cue or type your new hook"></textarea></div>
+   <div class="preview-actions"><button class="button small button-ghost" data-action="preview-apply-text">✓ Apply caption text</button><button class="button small" data-action="preview-center-text">↔ Reset position</button></div>
+   <div class="form-grid"><label class="form-field">Horizontal position (%)<input class="field" type="number" id="preview-caption-x" min="20" max="80" step="1" value="${Number.isFinite(Number(current?.captionX))?Math.min(80,Math.max(20,Number(current.captionX))):50}"></label><label class="form-field">Vertical position (%)<input class="field" type="number" id="preview-caption-y" min="12" max="85" step="1" value="${Number.isFinite(Number(current?.captionY))?Math.min(85,Math.max(12,Number(current.captionY))):75}"></label></div>
+   <label class="checkbox-row"><input id="preview-remove-commentary" type="checkbox" ${(current?.voiceMode||'none')==='none'?'checked':''}><span><strong>Remove AI commentary</strong> — retain original stream audio when available</span></label>
+   <p class="footnote">This removes added narration, not words or music already in the original recording. If there is no original audio, output may be silent.</p>
+  </div>
   <div class="tiny-muted" id="preview-file-name">${previewMediaName?esc(previewMediaName):'No media loaded — local media is never saved or uploaded.'}</div>
   <div class="preview-time-controls"><div class="form-field"><label for="preview-start">Source start (seconds)</label><input class="field" type="number" step="0.01" min="0" id="preview-start" value="${Number(current?.start||0)}"></div><div class="form-field"><label for="preview-length">Clip length (seconds)</label><input class="field" type="number" step="0.01" min="3" max="180" id="preview-length" value="${Number(current?.duration||30)}"></div></div>
   <p class="secondary-note">Captions are relative to the trimmed clip (0 = clip beginning). Load video footage you own or have permission to edit. Source start and duration are saved with your project.</p>
