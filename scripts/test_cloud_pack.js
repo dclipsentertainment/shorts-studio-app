@@ -59,14 +59,31 @@ async function run(){
  const tampered=Uint8Array.from(artwork);tampered[45]^=1;
  await assert.rejects(()=>pack.imagesFromArchive(zipFile(tampered)),/integrity|invalid|format/i);
 
+
+ const mp4=new Uint8Array(1250);mp4.set([0,0,0,32,102,116,121,112,105,115,111,109],0);
+ const artifact=pack.zip([
+   {name:'output/test-video.mp4',data:mp4},
+   {name:'output/quality-report.json',data:new TextEncoder().encode('{"status":"pass"}')}
+ ]);
+ const fileOut=await pack.videoFromArtifactZip(new File([artifact],'finished-online-video.zip',{type:'application/zip'}));
+ assert.equal(fileOut.name,'test-video.mp4');
+ assert.equal(fileOut.type,'video/mp4');
+ assert.equal(fileOut.size,1250);
+ await assert.rejects(()=>pack.videoFromArtifactZip(
+   new File([pack.zip([{name:'notes.txt',data:png}])],'finished-online-video.zip')),/unexpected file/);
+ const fakeMp4=Uint8Array.from(mp4);fakeMp4[5]=99;
+ await assert.rejects(()=>pack.videoFromArtifactZip(
+   new File([pack.zip([{name:'fake.mp4',data:fakeMp4}])],'finished-online-video.zip')),/not an MP4/);
+
  const app=fs.readFileSync('app.js','utf8'),html=fs.readFileSync('index.html','utf8');
  assert(app.includes('data-action="cloud-export"')&&app.includes('data-action="cloud-clear"'));
  assert(html.includes('cloud-pack.js'));
  assert(app.includes('cloudImagesSelected')&&app.includes('cloudSwitchScene'));
+ assert(app.includes('videoFromArtifactZip'),'GitHub artifact ZIP should open directly in the video reviewer');
  const extracted=[];
  // ZIP stored entries retain literal UTF-8 filenames for external GitHub runner.
  for(const str of ['render-job.json','user-data/media/scene-01.png','user-data/media/scene-02.jpg'])
   assert(Buffer.from(z).includes(Buffer.from(str)),str+' missing');
- console.log('PASS: bulk scene matching, manual swaps, image-type validation, sealed private render ZIP, no network or API costs.');
+ console.log('PASS: bulk scene matching, manual swaps, image-type validation, sealed private render ZIP, GitHub artifact ZIP playback, no network or API costs.');
 }
 run().catch(e=>{console.error(e);process.exitCode=1});
