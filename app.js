@@ -984,7 +984,7 @@ function openProject(id,opts={}){
  ${input('sourcePath','Source media path (rendering)',co.sourcePath,'assets/my-video.mp4')}
  ${input('sourceUrl','Direct HTTPS media URL (optional)',co.sourceUrl,'https://example.com/my-video.mp4','url')}
  ${input('start','Clip start · seconds',co.start,'0','number','min="0" step="0.1"')}
- ${input('duration','Video duration · seconds',co.duration,'35','number','min="3" max="'+(co.kind==='original'?600:180)+'" step="1" required')}
+ ${input('duration','Video duration · seconds',co.duration,'35','number','min="3" max="600" step="1" required')}
  ${select('captionStyle','Caption style',co.captionStyle||'classic',[['classic','Classic subtitles'],['word-pop','Animated word-group captions (approximate)'],['kinetic','Kinetic pop captions (best with timed subtitles)'],['hook','Headline at top only — keep streamer audio'],['none','No captions or text']])}
  ${select('cropFocus','Crop focus',co.cropFocus||'center',[['center','Center'],['left','Left side'],['right','Right side'],['smart-face','Track visible face (optional OpenCV; falls back to centre)']])}
  ${select('motion','Motion preset',co.motion||'none',[['none','Steady'],['gentle-pan','Gentle horizontal pan']])}
