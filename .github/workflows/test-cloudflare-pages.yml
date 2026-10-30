@@ -9,6 +9,7 @@ on:
       - cloudflare/**
       - scripts/build_cloudflare_pages.sh
       - scripts/test_github_usage.js
+      - scripts/test_caption_ui.js
       - .github/workflows/test-cloudflare-pages.yml
   workflow_dispatch:
 permissions:
