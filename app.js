@@ -329,7 +329,7 @@ function addCandidate(reportId,index){
 function parseTimedCaptions(value,duration){
  const raw=str(value);if(!raw)return [];
  let segments;try{segments=JSON.parse(raw)}catch(_){throw Error('Timed captions must be valid JSON')}
- if(!Array.isArray(segments)||segments.length<1||segments.length>250)throw Error('Timed captions need 1–250 segments');
+ if(!Array.isArray(segments)||segments.length<1||segments.length>900)throw Error('Timed captions need 1–900 segments');
  let last=0;
  return segments.map((x,i)=>{
   if(!x||typeof x!=='object'||Array.isArray(x)||x.start_seconds==null||x.end_seconds==null)throw Error(`Missing times in timed caption ${i+1}`);
@@ -577,7 +577,7 @@ function renderBlockers(p){
  if(p.aiReview?.required && (!p.aiReview.confirmed || !p.aiReview.claims?.length)) issues.push('Review AI script facts and supporting sources');
  if(!channel(p.channelId)) issues.push('Channel no longer exists');
  const duration=Number(p.duration),start=Number(p.start||0);
- if(!Number.isFinite(duration)||duration<3||duration>180||!Number.isFinite(start)||start<0) issues.push('Invalid clip timing');
+ if(!Number.isFinite(duration)||duration<3||duration>(p.kind==='original'?600:180)||!Number.isFinite(start)||start<0) issues.push('Duration exceeds the allowed limit for this video type');
  return issues;
 }
 function createRenderJob(p){return {version:1,id:p.id,title:p.ytTitle||p.title,kind:p.kind,channel:channel(p.channelId)?.name||'Unassigned',duration:p.duration,source:{path:p.sourcePath||null,url:p.sourceUrl||null,start_seconds:p.start||0},narration:{mode:p.voiceMode||'none',voice:p.voiceName||'af_heart',speed:0.96,sync_captions:true,audio_path:p.audioPath||null},script:p.script||'',caption_segments:parseTimedCaptions(p.timedCaptions,p.duration),captions:Boolean(p.script||p.timedCaptions||p.captionStyle==='hook'),rights_confirmed:true,editing:{caption_style:p.captionStyle||'classic',crop_focus:p.cropFocus||'center',motion:p.motion||'none',background:p.background||'midnight',hook_text:p.hookText||p.title,caption_x:captionPosition(p,p.captionStyle||'classic').x,caption_y:captionPosition(p,p.captionStyle||'classic').y},visuals:{mode:p.visualMode||'classic',intro_seconds:2,theme:p.visualTheme||'aurora',transition:p.visualTransition||'fade',scenes:p.visualScenes||[]},description:p.description||'',generated_at:new Date().toISOString()}}
@@ -984,7 +984,7 @@ function openProject(id,opts={}){
  ${input('sourcePath','Source media path (rendering)',co.sourcePath,'assets/my-video.mp4')}
  ${input('sourceUrl','Direct HTTPS media URL (optional)',co.sourceUrl,'https://example.com/my-video.mp4','url')}
  ${input('start','Clip start · seconds',co.start,'0','number','min="0" step="0.1"')}
- ${input('duration','Video duration · seconds',co.duration,'35','number','min="3" max="180" step="1" required')}
+ ${input('duration','Video duration · seconds',co.duration,'35','number','min="3" max="'+(co.kind==='original'?600:180)+'" step="1" required')}
  ${select('captionStyle','Caption style',co.captionStyle||'classic',[['classic','Classic subtitles'],['word-pop','Animated word-group captions (approximate)'],['kinetic','Kinetic pop captions (best with timed subtitles)'],['hook','Headline at top only — keep streamer audio'],['none','No captions or text']])}
  ${select('cropFocus','Crop focus',co.cropFocus||'center',[['center','Center'],['left','Left side'],['right','Right side'],['smart-face','Track visible face (optional OpenCV; falls back to centre)']])}
  ${select('motion','Motion preset',co.motion||'none',[['none','Steady'],['gentle-pan','Gentle horizontal pan']])}
@@ -1034,7 +1034,7 @@ function submitEditor(form){let fd=new FormData(form),raw=k=>str(fd.get(k));let 
   const ytRetention=raw('retentionYT')===''?null:Number(raw('retentionYT')),igRetention=raw('retentionIG')===''?null:Number(raw('retentionIG'));
   const likesYT=Number(raw('likesYT')||0),likesIG=Number(raw('likesIG')||0),followersGained=Number(raw('followersGained')||0),revenueEur=Number(raw('revenueEur')||0),revenues=Object.fromEntries(['YT','IG','TT','FB'].map(k=>[k,Number(raw('revenue'+k)||0)]));
   if(!raw('title')){notice('Enter a title.');return}
-  if(!Number.isFinite(start)||start<0||!Number.isFinite(duration)||duration<3||duration>180){notice('Duration must be 3–180 seconds and start ≥ 0.');return}
+  if(!Number.isFinite(start)||start<0||!Number.isFinite(duration)||duration<3||duration>(raw('kind')==='original'?600:180)){notice('Video duration must be 3–600 seconds for original stories or 3–180 seconds for clips.');return}
   if(![vYT,vIG,vTT,vFB,likesYT,likesIG,followersGained].every(v=>Number.isSafeInteger(v)&&v>=0)){notice('Views, likes and followers must be non-negative whole numbers.');return}
   if(![ytRetention,igRetention].every(v=>v===null||(Number.isFinite(v)&&v>=0&&v<=1000))){notice('Percentage viewed must be 0–1000%, or left blank.');return}
   if(![revenueEur,...Object.values(revenues)].every(n=>Number.isFinite(n)&&n>=0&&n<=100000000)){notice('Revenue must be a non-negative euro amount.');return}
@@ -1108,7 +1108,7 @@ function productionPage(){
    <div class="panel-head"><h2>1. Prepare your Short</h2><span class="tiny-muted">Saves into your existing project</span></div>
    <div class="form-field"><label for="production-project">Choose a project</label><select class="field" id="production-project">${state.projects.map(x=>`<option value="${esc(x.id)}" ${x.id===current?.id?'selected':''}>${esc(x.title)} · ${esc(channel(x.channelId)?.name||'Unassigned')}</option>`).join('')}</select></div>
    ${current?`<div class="form-field"><label for="production-title">Video title</label><input class="field" id="production-title" maxlength="150" value="${esc(current.title)}"></div>
-    <div class="production-pair"><div class="form-field"><label for="production-length">Duration (3–180 sec)</label><input class="field" id="production-length" type="number" min="3" max="180" step=".1" value="${Number(current.duration||30)}"></div>
+    <div class="production-pair"><div class="form-field"><label for="production-length">Duration (${current.kind==='original'?'3–600':'3–180'} sec)</label><input class="field" id="production-length" type="number" min="3" max="${current.kind==='original'?600:180}" step=".1" value="${Number(current.duration||30)}"></div>
     <div class="form-field"><label for="production-start">Source start (seconds)</label><input class="field" id="production-start" type="number" min="0" step=".1" value="${Number(current.start||0)}"></div></div>
     <div class="form-field"><label for="production-script">Narration script / spoken words</label><textarea class="field production-script" id="production-script" rows="7" maxlength="10000" placeholder="Paste your researched, original script here…">${esc(current.script||'')}</textarea></div>
     <div class="production-pair"><div class="form-field"><label for="production-voice">Narration</label><select class="field" id="production-voice"><option value="kokoro" ${current.voiceMode==='kokoro'?'selected':''}>Natural AI narrator (four voice choices)</option><option value="basic" ${current.voiceMode==='basic'?'selected':''}>Free basic voice (if FFmpeg supports Flite)</option><option value="none" ${current.voiceMode==='none'?'selected':''}>Original audio / no added voice</option><option value="file" ${current.voiceMode==='file'?'selected':''}>My own narration audio file</option></select></div>
@@ -1281,7 +1281,7 @@ function productionDraftSave(){
  const duration=Number($('#production-length')?.value);
  const start=Number($('#production-start')?.value);
  if(!title)throw Error('Enter a video title.');
- if(!Number.isFinite(duration)||duration<3||duration>180||!Number.isFinite(start)||start<0)throw Error('Video length must be 3–180 seconds and start must be nonnegative.');
+ if(!Number.isFinite(duration)||duration<3||duration>(p.kind==='original'?600:180)||!Number.isFinite(start)||start<0)throw Error('Original stories allow up to 600 seconds; clips allow up to 180 seconds.');
  const cues=productionCues.length?parseTimedCaptions(JSON.stringify(productionCues),duration):[];
  const changes=p.script!==script||p.duration!==duration||Number(p.start||0)!==start||p.title!==title;
  if(p.aiReview?.required && changes)p.aiReview.confirmed=false;
@@ -1327,7 +1327,7 @@ function productionEstimate(){
  const words=script.trim().replace(/\s+/g,' ').split(' ').filter(Boolean);
  if(!words.length)return;
  const groups=[];for(let i=0;i<words.length;i+=4)groups.push(words.slice(i,i+4).join(' '));
- if(groups.length>250){notice('Script too long for this caption style.');return}
+ if(groups.length>900){notice('Script too long for this caption style.');return}
  const weight=groups.map(c=>Math.max(1,c.split(' ').length));const total=weight.reduce((a,b)=>a+b,0);
  let at=0;productionCues=groups.map((text,i)=>{const start=at;at=i===groups.length-1?duration:at+duration*weight[i]/total;return {start_seconds:+start.toFixed(3),end_seconds:+at.toFixed(3),text}});
  productionPaint();notice('Estimated timings created. These are NOT speech-synchronised; review or run transcription.');
