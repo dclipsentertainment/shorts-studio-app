@@ -13,3 +13,6 @@ dist/
 __pycache__/
 *.pyc
 .DS_Store
+
+# Cloudflare site build output (published by Pages, never committed)
+dist-cloudflare/
