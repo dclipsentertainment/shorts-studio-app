@@ -1191,6 +1191,7 @@ async function copyText(text){try{if(navigator.clipboard?.writeText){await navig
 let productionProjectId='';
 let productionCues=[];
 const cloudImagePacks=new Map(); // Files remain browser-only until explicitly downloaded as a private ZIP.
+const cloudFinishedPreviews=new Map(); // User-supplied finished MP4s, not server-verified renders.
 let productionVideoUrl='';
 let productionVideoBlobUrl='';
 let productionVideoFile=null;
@@ -1218,7 +1219,7 @@ function productionLoadProject(id){
  render();productionCheckBackend();
 }
 function seriesRevisionPanel(current,last,outputUrl){
- if(!current?.series||current.series.superseded||!last||!outputUrl)return '';
+ if(!current?.series||current.series.superseded||(!last&&!cloudFinishedPreviews.has(current.id))||(!outputUrl&&!cloudFinishedPreviews.has(current.id)))return '';
  const record=(state.seriesPlans||[]).find(x=>x.id===current.series.id);
  const profile=window.DClipsSeries?.PROFILES?.[current.series.platform];
  if(!record||!profile)return '';
@@ -1238,6 +1239,27 @@ function seriesRevisionPanel(current,last,outputUrl){
  <button type="button" class="button button-primary" data-action="production-series-rebalance">↻ Create revised parts</button>`}
  </section>`;
 }
+function cloudVideoPanel(current){
+ if(!current?.series)return '';
+ const item=cloudFinishedPreviews.get(current.id);
+ return `<section class="panel" style="margin-top:16px">
+ <div class="panel-head"><h2>Review the finished cloud video</h2><span class="tiny-muted">AFTER GITHUB ACTIONS</span></div>
+ <p class="secondary-note">Download the finished MP4 from your private GitHub Actions run. Select it here to watch on this page, then revise parts or scene timings. The MP4 stays in your browser and is never uploaded to our public site. This review is not a technical quality approval.</p>
+ <input type="file" id="cloud-finished-mp4" accept="video/mp4,.mp4" aria-label="Select finished online rendered MP4">
+ ${item?`<video controls playsinline id="cloud-preview-player" src="${esc(item.url)}" style="width:100%;max-height:450px;margin-top:14px"></video>
+ <p class="tiny-muted">${esc(item.name)} · watch to the end to unlock revised episode controls.</p>`:'<p class="tiny-muted">No cloud-rendered MP4 selected yet.</p>'}
+ </section>`;
+}
+function cloudReceiveVideo(file){
+ const p=productionProject();if(!p||!file)return;
+ if(!/\\.mp4$/i.test(file.name)||file.size<1000||file.size>500*1024*1024){notice('Choose a finished MP4 under 500 MiB.');return}
+ const previous=cloudFinishedPreviews.get(p.id);
+ if(previous)URL.revokeObjectURL(previous.url);
+ cloudFinishedPreviews.set(p.id,{url:URL.createObjectURL(file),name:file.name,fingerprint:renderFingerprint(p)});
+ watchedSeriesRenderKey='';
+ render();notice('Finished cloud video loaded locally. Watch it from beginning to end before revising.');
+}
+
 function cloudImagePanel(current){
  if(!current||current.kind!=='original')return '';
  const set=cloudImagePacks.get(current.id),scenes=current.visualScenes||[];
@@ -1392,6 +1414,7 @@ Why it matters">${esc((current.visualScenes||[]).map(x=>(x.start_seconds==null?'
  ${checks.length?`<div class="notice warn">Current project blockers: ${esc(checks.slice(0,3).join(' · '))}</div>`:''}
  </div><div class="production-output"><video id="production-output-video" controls playsinline ${outputUrl?`src="${esc(outputUrl)}"`:''}></video>${outputUrl?`<a class="button button-primary small" id="production-download" href="${esc(outputUrl)}" download>⇩ Save rendered MP4</a>`:'<p class="tiny-muted">Your rendered MP4 will appear here.</p>'}</div></div>
 
+ ${cloudVideoPanel(current)}
  ${seriesRevisionPanel(current,last,outputUrl)}
  <section class="panel production-review" style="margin-top:18px">
   <div class="panel-head"><h2>4. Final quality & rights review</h2><span class="tiny-muted">MANUAL APPROVAL · NEVER AUTO-POST</span></div>
@@ -1759,7 +1782,7 @@ function productionRebalanceSeries(){
   const current=productionDraftSave();
   const series=current.series;
   if(!series||series.superseded)throw Error('Choose an active story-series episode first.');
-  if(!latestRender(current)||watchedSeriesRenderKey!==current.id+'|'+renderFingerprint(current))
+  if((!latestRender(current)&&cloudFinishedPreviews.get(current.id)?.fingerprint!==renderFingerprint(current))||watchedSeriesRenderKey!==current.id+'|'+renderFingerprint(current))
    throw Error('Watch the full finished MP4 before adjusting this series.');
   const record=(state.seriesPlans||[]).find(x=>x.id===series.id);
   const profile=window.DClipsSeries?.PROFILES?.[series.platform];
@@ -1856,6 +1879,7 @@ document.addEventListener('input',ev=>{
  if(['preview-caption-x','preview-caption-y'].includes(ev.target.id))moveTextInput('preview');
  if(['production-caption-x','production-caption-y'].includes(ev.target.id))moveTextInput('production');if(ev.target.dataset.productionCue){const cue=productionCues[Number(ev.target.dataset.index)];if(cue){const field=ev.target.dataset.productionCue;cue[field]=field==='text'?ev.target.value:Number(ev.target.value);productionUpdateOverlay();}}if(ev.target.dataset.cueField){let s=previewSegments[Number(ev.target.dataset.index)];if(s){let v=ev.target.dataset.cueField;s[v]=v==='text'?ev.target.value:Number(ev.target.value);previewUpdateOverlay();}}});
 document.addEventListener('change',ev=>{if(ev.target.id==='production-cloud-images')cloudImagesSelected(ev.target.files);
+ if(ev.target.id==='cloud-finished-mp4')cloudReceiveVideo(ev.target.files?.[0]);
  if(ev.target.dataset.cloudSlot!==undefined)cloudSwitchScene(Number(ev.target.dataset.cloudSlot),ev.target.value);
  if(['studio-channel','studio-status','studio-sort'].includes(ev.target.id))applyStudioFilters();if(ev.target.id==='production-caption-style'){const pos=$('#production-caption-y');if(pos){const p=productionProject();if(!p||!Number.isFinite(Number(p.captionY)))pos.value=ev.target.value==='hook'?19:75;}productionUpdateOverlay();}
  if(ev.target.id==='production-project')productionLoadProject(ev.target.value);if(ev.target.id==='production-cue-file'){productionImport(ev.target.files[0]);ev.target.value=''}if(ev.target.id==='preview-overlay-mode'){const p=previewProject();if(p){p.captionStyle=ev.target.value;const y=$('#preview-caption-y');if(y&&!Number.isFinite(Number(p.captionY)))y.value=ev.target.value==='hook'?19:75;previewUpdateOverlay();}}
@@ -1863,6 +1887,12 @@ document.addEventListener('change',ev=>{if(ev.target.id==='production-cloud-imag
  if(ev.target.id==='preview-project')previewSelectProject(ev.target.value);if(ev.target.id==='preview-file')previewSetFile(ev.target.files[0]);if(ev.target.id==='preview-subtitle-file')previewImport(ev.target.files[0]);if(ev.target.dataset.cueField){let s=previewSegments[Number(ev.target.dataset.index)];if(s){s[ev.target.dataset.cueField]=ev.target.dataset.cueField==='text'?ev.target.value:Number(ev.target.value);previewUpdateOverlay();}}if(ev.target.id==='import-file'){importBackup(ev.target.files[0]);ev.target.value=''}if(ev.target.id==='scout-file'){importScout(ev.target.files[0]);ev.target.value=''}if(ev.target.id==='trend-file'){importTrends(ev.target.files[0]);ev.target.value=''}if(ev.target.id==='discovery-file'){importDiscovery(ev.target.files[0]);ev.target.value=''}if(ev.target.id==='ai-file'){importAiFile(ev.target.files[0]);ev.target.value=''}});
 document.addEventListener('click',ev=>{let b=ev.target.closest('[data-filter]');if(b){filter=b.dataset.filter;render()}let n=ev.target.closest('[data-discovery-niche]');if(n){discoveryNiche=n.dataset.discoveryNiche;render()}});
 document.addEventListener('ended',ev=>{
+ if(ev.target.id==='cloud-preview-player'){
+  const current=productionProject(),item=current&&cloudFinishedPreviews.get(current.id);
+  if(current?.series&&item&&item.fingerprint===renderFingerprint(current)){
+   watchedSeriesRenderKey=current.id+'|'+renderFingerprint(current);render();notice('Finished video watched. You can now revise story length and parts.');
+  }
+ }
  if(ev.target.id==='production-output-video'){
   const current=productionProject();
   if(current?.series&&latestRender(current)&&ev.target.currentSrc){
