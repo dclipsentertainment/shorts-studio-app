@@ -21,8 +21,8 @@ assert.throws(()=>planner.plan({title:'X',script:sample,platforms:[]}),/Select a
 const app=fs.readFileSync('app.js','utf8'),html=fs.readFileSync('index.html','utf8');
 assert(html.includes('data-nav="series"') && html.indexOf('story-series.js')<html.indexOf('app.js'));
 const elements={},inputs={};
-for(const id of ['main','nav-channel-count','today-date','crumb-current','mobile-menu'])
- elements[id]={textContent:'',innerHTML:'',classList:{toggle(){},remove(){}},addEventListener(){}};
+for(const id of ['main','nav-channel-count','today-date','crumb-current','mobile-menu','toast'])
+ elements[id]={textContent:'',innerHTML:'',classList:{toggle(){},remove(){},add(){}},addEventListener(){}};
 for(const [id,value] of Object.entries({'series-title':'Caesar: a life','series-script':sample,
  'series-wpm':'145','series-channel':'ch','series-mode-IG':'parts','series-mode-YT':'parts',
  'series-mode-TT':'parts','series-mode-FB':'full','series-target-IG':'45',
