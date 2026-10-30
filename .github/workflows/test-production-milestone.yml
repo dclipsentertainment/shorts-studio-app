@@ -1,0 +1,35 @@
+name: Test DClips Phase 1 production milestone
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/render.py
+      - scripts/local_studio.py
+      - scripts/quality_check.py
+      - scripts/test_local_production.py
+      - .github/workflows/test-production-milestone.yml
+permissions:
+  contents: read
+jobs:
+  production-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install FFmpeg / ASS caption renderer
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg fonts-dejavu-core
+      - name: Verify Python syntax and core production
+        run: |
+          python -m compileall -q scripts
+          python scripts/test_local_production.py
+      - name: Verify dashboard JavaScript
+        run: |
+          node --check app.js
+          node --check github-usage.js
+          node scripts/test_github_usage.js
+          node scripts/test_caption_ui.js
