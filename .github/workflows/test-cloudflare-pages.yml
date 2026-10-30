@@ -1,0 +1,40 @@
+name: Verify public DClips Cloudflare Pages build
+on:
+  push:
+    paths:
+      - index.html
+      - app.js
+      - github-usage.js
+      - styles.css
+      - cloudflare/**
+      - scripts/build_cloudflare_pages.sh
+      - scripts/test_github_usage.js
+      - .github/workflows/test-cloudflare-pages.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check-site:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Build and validate Cloudflare Pages site
+        run: bash scripts/build_cloudflare_pages.sh
+      - name: Verify only intended public assets are shipped
+        run: |
+          test "$(find dist-cloudflare -maxdepth 1 -type f | wc -l)" -eq 5
+          test ! -e dist-cloudflare/scripts
+          test ! -e dist-cloudflare/user-data
+          test ! -e dist-cloudflare/reports
+          test ! -e dist-cloudflare/.github
+          grep -q 'data-nav="usage"' dist-cloudflare/index.html
+          echo 'PASS: public site is self-contained, with separated navigation and no credentials.'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cloudflare-pages-preview-bundle
+          path: dist-cloudflare/
+          retention-days: 7
