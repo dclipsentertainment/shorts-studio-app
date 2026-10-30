@@ -475,7 +475,7 @@ function latestRender(p){
  if(!/^\/output\/[0-9a-f]{32}\/[a-z0-9-]{1,50}\.mp4$/.test(p.lastRender.url||''))return null;
  return p.lastRender;
 }
-function renderFingerprint(p){return JSON.stringify([p.sourcePath||'',p.sourceUrl||'',Number(p.start||0),Number(p.duration),p.script||'',p.timedCaptions||'',p.voiceMode||'',p.audioPath||'',p.voiceName||'',p.hookText||'',p.captionX??50,p.captionY??75,p.channelId,p.captionStyle||'classic',p.cropFocus||'center',p.motion||'none',p.background||'midnight',p.visualMode||'classic',p.visualTheme||'aurora',p.visualTransition||'fade',JSON.stringify(p.visualScenes||[])]);}
+function renderFingerprint(p){return JSON.stringify([p.kind||'',p.title||'',p.ytTitle||'',p.sourcePath||'',p.sourceUrl||'',Number(p.start||0),Number(p.duration),p.script||'',p.timedCaptions||'',p.voiceMode||'',p.audioPath||'',p.voiceName||'',p.hookText||'',p.captionX??50,p.captionY??75,p.channelId,p.captionStyle||'classic',p.cropFocus||'center',p.motion||'none',p.background||'midnight',p.visualMode||'classic',p.visualTheme||'aurora',p.visualTransition||'fade',JSON.stringify(p.visualScenes||[])]);}
 function exportRenderBatch(){
  const candidates=state.projects.filter(p=>['ready','scheduled'].includes(p.status));
  const good=candidates.filter(p=>renderBlockers(p).length===0);
