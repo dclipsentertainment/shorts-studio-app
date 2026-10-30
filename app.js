@@ -401,16 +401,17 @@ function analyticsPage(){
 }
 function growthPage(){
  const published=state.projects.filter(p=>p.status==='published');
- const totalViews=p=>Math.max(0,Number(p.viewsYT||0))+Math.max(0,Number(p.viewsIG||0));
+ const totalViews=p=>['YT','IG','TT','FB'].reduce((sum,k)=>sum+Math.max(0,Number(p['views'+k]||0)),0);
  const total=published.reduce((a,p)=>a+totalViews(p),0);
  const likes=published.reduce((a,p)=>a+Math.max(0,Number(p.likesYT||0))+Math.max(0,Number(p.likesIG||0)),0);
  const followers=published.reduce((a,p)=>a+Math.max(0,Number(p.followersGained||0)),0);
- const revenue=published.reduce((a,p)=>a+Math.max(0,Number(p.revenueEur||0)),0);
+ const projectRevenue=p=>['YT','IG','TT','FB'].reduce((sum,k)=>sum+Math.max(0,Number(p['revenue'+k]||0)),Math.max(0,Number(p.revenueEur||0)));
+ const revenue=published.reduce((a,p)=>a+projectRevenue(p),0);
  const rpm=total>0?(revenue/total*1000):null;
  const ranked=published.filter(p=>totalViews(p)>0).sort((a,b)=>totalViews(b)-totalViews(a));
  const ret=[];for(const p of published){for(const [v,r] of [[p.viewsYT,p.retentionYT],[p.viewsIG,p.retentionIG]]){if(v>0 && r!==null && r!==undefined && r!=='' && Number.isFinite(Number(r)))ret.push({weight:Number(v),pct:Number(r)})}}
  const averageRetention=ret.length?ret.reduce((a,x)=>a+x.weight*x.pct,0)/ret.reduce((a,x)=>a+x.weight,0):null;
- const paid=published.filter(p=>Number(p.revenueEur||0)>0).length;
+ const paid=published.filter(p=>projectRevenue(p)>0).length;
  return `${heading('MEASURE WHAT ACTUALLY WORKS','Growth lab','Compare your published videos using views, audience retention and real recorded earnings.')}
  <div class="notice" style="margin-bottom:18px">All figures are <strong>entered manually</strong> into published projects. No social accounts are connected, and nothing here predicts income. Revenue is gross, not profit. Averages from small samples can mislead.</div>
  <div class="kpis">
@@ -429,16 +430,16 @@ function growthPage(){
  <button class="button button-ghost small" data-action="export-growth" ${!published.length?'disabled':''}>⇩ Export growth report</button></section></div>
  <h2 class="section-title">Growth assistant · evidence-based suggestions</h2><div style="margin-bottom:22px">${growthAdvice(published)}</div>
  <h2 class="section-title">Published video leaderboard <span class="tiny-muted">${ranked.length} with views</span></h2>
- ${ranked.length?`<div class="tablewrap"><table class="data-table"><thead><tr><th>Video</th><th>Views</th><th>YouTube retention</th><th>Instagram retention</th><th>Revenue</th><th></th></tr></thead><tbody>${ranked.map(p=>`<tr><td class="title-cell">${esc(p.title)}<span class="subcell">${esc(channel(p.channelId)?.name||'Unassigned')} · ${esc(p.kind)}</span></td><td><strong>${num(totalViews(p))}</strong></td><td>${p.retentionYT===null||p.retentionYT===undefined?'—':esc(Number(p.retentionYT).toFixed(1))+'%'}</td><td>${p.retentionIG===null||p.retentionIG===undefined?'—':esc(Number(p.retentionIG).toFixed(1))+'%'}</td><td>€${Number(p.revenueEur||0).toFixed(2)}</td><td><button class="kebab" data-action="edit-content" data-id="${esc(p.id)}">Edit</button></td></tr>`).join('')}</tbody></table></div>`:empty('▥','No published results yet','Mark videos Published and enter real view counts to see which topics and formats perform best.','Go to content studio','go-studio')}
+ ${ranked.length?`<div class="tablewrap"><table class="data-table"><thead><tr><th>Video</th><th>Views</th><th>YouTube retention</th><th>Instagram retention</th><th>Revenue</th><th></th></tr></thead><tbody>${ranked.map(p=>`<tr><td class="title-cell">${esc(p.title)}<span class="subcell">${esc(channel(p.channelId)?.name||'Unassigned')} · ${esc(p.kind)}</span></td><td><strong>${num(totalViews(p))}</strong></td><td>${p.retentionYT===null||p.retentionYT===undefined?'—':esc(Number(p.retentionYT).toFixed(1))+'%'}</td><td>${p.retentionIG===null||p.retentionIG===undefined?'—':esc(Number(p.retentionIG).toFixed(1))+'%'}</td><td>€${projectRevenue(p).toFixed(2)}</td><td><button class="kebab" data-action="edit-content" data-id="${esc(p.id)}">Edit</button></td></tr>`).join('')}</tbody></table></div>`:empty('▥','No published results yet','Mark videos Published and enter real view counts to see which topics and formats perform best.','Go to content studio','go-studio')}
  <p class="footnote">The numbers are never invented. Empty retention is shown as missing, not 0%. Use consistent time windows to compare performance across videos.</p>`;
 }
 function growthAdvice(projects){
- const measured=projects.filter(p=>(Number(p.viewsYT||0)+Number(p.viewsIG||0))>0);
+ const measured=projects.filter(p=>['YT','IG','TT','FB'].reduce((sum,k)=>sum+Number(p['views'+k]||0),0)>0);
  if(measured.length<3)return `<div class="notice">Record results from at least three published videos to unlock useful comparisons. Current sample: ${measured.length}/3.</div>`;
  const byChannel=new Map();for(const p of measured){if(!byChannel.has(p.channelId))byChannel.set(p.channelId,[]);byChannel.get(p.channelId).push(p)}
  let html='';
  for(const [id,items] of byChannel){if(items.length<3)continue;
-  const ranked=items.map(p=>({p,v:Number(p.viewsYT||0)+Number(p.viewsIG||0)})).sort((a,b)=>b.v-a.v);
+  const ranked=items.map(p=>({p,v:['YT','IG','TT','FB'].reduce((sum,k)=>sum+Number(p['views'+k]||0),0)})).sort((a,b)=>b.v-a.v);
   const median=[...ranked].sort((a,b)=>a.v-b.v)[Math.floor((ranked.length-1)/2)].v;
   const winner=ranked[0];
   const formatCount={clip:items.filter(p=>p.kind==='clip').length,original:items.filter(p=>p.kind==='original').length};
@@ -448,7 +449,7 @@ function growthAdvice(projects){
  return html?`<div class="idea-grid">${html}</div>`:`<div class="notice">You have ${measured.length} measured published videos, but fewer than three per channel. Record more videos on the same channel for a useful comparison.</div>`;
 }
 function exportGrowth(){
- const data={version:1,generated_at:new Date().toISOString(),measurement:'manual_unverified',currency:'EUR',projects:state.projects.filter(p=>p.status==='published').map(p=>({title:p.title,channel:channel(p.channelId)?.name||'Unassigned',kind:p.kind,views_youtube:Number(p.viewsYT||0),views_instagram:Number(p.viewsIG||0),average_percentage_viewed_youtube:p.retentionYT??null,average_percentage_viewed_instagram:p.retentionIG??null,likes_youtube:Number(p.likesYT||0),likes_instagram:Number(p.likesIG||0),followers_gained:Number(p.followersGained||0),revenue_eur:Number(p.revenueEur||0)}))};
+ const data={version:1,generated_at:new Date().toISOString(),measurement:'manual_unverified',currency:'EUR',projects:state.projects.filter(p=>p.status==='published').map(p=>({title:p.title,channel:channel(p.channelId)?.name||'Unassigned',kind:p.kind,views_youtube:Number(p.viewsYT||0),views_instagram:Number(p.viewsIG||0),average_percentage_viewed_youtube:p.retentionYT??null,average_percentage_viewed_instagram:p.retentionIG??null,likes_youtube:Number(p.likesYT||0),likes_instagram:Number(p.likesIG||0),followers_gained:Number(p.followersGained||0),views_tiktok:Number(p.viewsTT||0),views_facebook:Number(p.viewsFB||0),earnings_youtube_eur:Number(p.revenueYT||0),earnings_instagram_eur:Number(p.revenueIG||0),earnings_tiktok_eur:Number(p.revenueTT||0),earnings_facebook_eur:Number(p.revenueFB||0),revenue_eur:Number(p.revenueEur||0)+['YT','IG','TT','FB'].reduce((a,k)=>a+Number(p['revenue'+k]||0),0)}))};
  downloadJSON('shorts-studio-growth-report.json',data);notice('Manual growth report downloaded.');
 }
 function scriptSignals(script,title){
