@@ -250,7 +250,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 def make_ass_timed(segments: list, runtime: float, title: str, dest: Path, style: str) -> bool:
     """Render user-supplied, speech-aligned timings; do not guess where words occur."""
-    if not isinstance(segments, list) or len(segments) > 250:
+    if not isinstance(segments, list) or len(segments) > 900:
         raise JobError('Timed captions must be an array of up to 900 segments.')
     if not segments:
         return False
