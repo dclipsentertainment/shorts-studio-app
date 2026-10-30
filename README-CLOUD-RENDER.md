@@ -7,11 +7,11 @@ This workflow runs from the **online DClips dashboard**, even without a graphics
 1. Open **Quick Create**. Enter a story title; short description is optional.
 2. Click **Prepare my story with ChatGPT**, paste the generated request into ChatGPT, then paste the returned JSON into Quick Create.
 3. Review the complete story, chronological illustration prompts, factual sources, duration and part recommendations. Click **Create editable video drafts**.
-4. Generate illustrations with ChatGPT using the automatically prepared image prompt. Save the images separately (not as a collage). Prefer filenames `01-cover.png`, `02-scene.png`, `03-scene.png`, and so on.
+4. In **Production flow**, use **Copy ChatGPT image request for this episode** to get a numbered prompt for exactly that episode's scenes. Paste it into ChatGPT. Save the images separately (not as a collage). Prefer filenames `01-cover.png`, `02-scene.png`, `03-scene.png`, and so on.
 
 ## Bulk import from your browser
 
-1. Open **Production flow**, select the episode you want to produce. Use **Illustrated story** visual mode.
+1. Open **Production flow**, select the episode you want to produce. Use **Illustrated story** visual mode. Generate this episode's matching images from the provided ChatGPT prompt first.
 2. Under **ChatGPT image pack → online video**, choose all images together (PNG/JPG/WebP). The app matches numbered filenames to the same-numbered scene. Unnumbered images are assigned alphabetically into remaining positions.
 3. Check each thumbnail. Change the individual dropdown to swap the picture matched to a scene.
 4. Confirm you have the rights to use the images, narration and story. If it is a factual story, review the source claims in the content editor.
