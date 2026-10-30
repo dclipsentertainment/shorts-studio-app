@@ -35,6 +35,7 @@ jobs:
           node --check github-usage.js
           node scripts/test_github_usage.js
           node scripts/test_review_gate.js
+          node scripts/test_illustrated_ui.js
           python -m compileall -q scripts
       - name: Package public code only
         run: python scripts/make_app_release.py --out dist/shorts-studio-app.zip
