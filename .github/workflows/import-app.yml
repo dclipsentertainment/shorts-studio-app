@@ -3,7 +3,6 @@ on:
   push:
     paths:
       - shorts-studio-app-import.zip
-      - .github/workflows/import-app.yml
   workflow_dispatch:
 permissions:
   contents: write
