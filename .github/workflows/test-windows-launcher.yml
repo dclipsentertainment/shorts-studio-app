@@ -1,0 +1,47 @@
+name: Test DClips self-update on Windows
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - .github/workflows/test-windows-launcher.yml
+      - scripts/update.ps1
+      - OPEN-DASHBOARD.cmd
+      - OPEN-PRODUCTION-STUDIO.cmd
+permissions:
+  contents: read
+jobs:
+  update-smoke:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify pinned-source updater and preserved personal data
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP 'dclips-updater-smoke'
+          New-Item -ItemType Directory -Force -Path (Join-Path $root 'scripts'),(Join-Path $root 'user-data') | Out-Null
+          Copy-Item -LiteralPath .\scripts\update.ps1 -Destination (Join-Path $root 'scripts\update.ps1')
+          Set-Content -LiteralPath (Join-Path $root 'VERSION.json') -Value '{"version":"0.14.0"}'
+          Set-Content -LiteralPath (Join-Path $root 'user-data\project-sentinel.txt') -Value 'PRESERVE_PROJECTS'
+          Set-Content -LiteralPath (Join-Path $root 'index.html') -Value 'old app'
+          $updater=Join-Path $root 'scripts\update.ps1'
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater -CheckOnly
+          if ($LASTEXITCODE -ne 0) { throw "Check-only failed: $LASTEXITCODE" }
+          if ((Get-Content -LiteralPath (Join-Path $root 'VERSION.json') -Raw | ConvertFrom-Json).version -ne '0.14.0') {
+              throw 'Check-only unexpectedly installed an update.'
+          }
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater
+          if ($LASTEXITCODE -ne 0) { throw "Windows GitHub auto-update failed: $LASTEXITCODE" }
+          $version=(Get-Content -LiteralPath (Join-Path $root 'VERSION.json') -Raw | ConvertFrom-Json).version
+          if ([version]$version -le [version]'0.14.0') { throw "Update did not apply, got $version" }
+          foreach ($file in @('index.html','app.js','github-usage.js','styles.css',
+                  'OPEN-DASHBOARD.cmd','scripts\update.ps1','scripts\local_studio.py')) {
+              if (!(Test-Path -LiteralPath (Join-Path $root $file))) { throw "Missing updated file: $file" }
+          }
+          if ((Get-Content -LiteralPath (Join-Path $root 'user-data\project-sentinel.txt') -Raw).Trim() -ne 'PRESERVE_PROJECTS') {
+              throw 'User data changed during update.'
+          }
+          Write-Host "PASS: Windows pull v$version from official GitHub release; private data preserved."
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $updater -CheckOnly
+          if ($LASTEXITCODE -ne 0) { throw 'Repeat update check failed.' }
