@@ -18,7 +18,12 @@ const document={
 };
 const events={};
 const location={hash:'#preview',protocol:'file:',hostname:''};
-const localStorage={getItem(){return null;},setItem(){},removeItem(){}};
+const saved={version:1,channels:[{id:'c1',name:'Test creator',niche:'Gaming',color:'#8c7aff'}],
+ projects:[{id:'p1',title:'Candidate clip',kind:'clip',channelId:'c1',status:'draft',
+  duration:25,start:0,script:'Interesting gameplay',captionStyle:'classic',
+  voiceMode:'kokoro',voiceName:'af_heart',timedCaptions:'',rights:true}],
+ scoutReports:[],trends:[],streamers:[],discovery:null,viralThreshold:100000,createdAt:'2026-10-30T00:00:00Z'};
+const localStorage={getItem(key){return key==='shorts_studio_state_v1'?JSON.stringify(saved):null;},setItem(){},removeItem(){}};
 const context={document,location,localStorage,window:{
  DClipsUsageMonitor:{render(){return 'usage';},afterRender(){}},
  addEventListener(name,fn){events[name]=fn;},
