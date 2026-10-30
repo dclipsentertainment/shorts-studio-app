@@ -460,8 +460,18 @@ function renderBlockers(p){
  if(p.voiceMode==='file'&&!p.audioPath) issues.push('Narration audio file missing');
  if(['basic','kokoro'].includes(p.voiceMode)&&!p.script?.trim()) issues.push('Narration script missing');
  if(p.kind==='original' && /\[(RESEARCH|EXAMPLE|PAYOFF|HOOK|MAIN|END)\]/i.test(p.script||'')) issues.push('Replace research placeholders in the script');
- if(p.kind==='original' && p.visualMode==='storyboard' && (p.sourcePath||p.sourceUrl)) issues.push('Storyboard needs generated background: click Use generated background in Production flow');
- if(p.kind==='original' && p.visualMode==='storyboard' && p.visualScenes?.length && Number(p.duration)/p.visualScenes.length<1.2) issues.push('Storyboard scenes too short: use fewer scenes or a longer video');
+ if(p.kind==='original' && ['storyboard','illustrated'].includes(p.visualMode) && (p.sourcePath||p.sourceUrl)) issues.push('Storyboard needs generated background: click Use generated background in Production flow');
+ if(p.kind==='original' && ['storyboard','illustrated'].includes(p.visualMode) && p.visualScenes?.length && Number(p.duration)/p.visualScenes.length<1.2) issues.push('Storyboard scenes too short: use fewer scenes or a longer video');
+ if(p.kind==='original' && p.visualMode==='illustrated'){
+  const scenes=p.visualScenes||[];
+  if(scenes.length<2) issues.push('Illustrated story needs a cover image and at least one story image');
+  if(scenes.some(s=>!s.image_path)) issues.push('Add a separate licensed/AI-created illustration for every scene, including the opening cover');
+  const times=scenes.slice(1).map(s=>s.start_seconds);
+  if(times.some(x=>x!=null) && (times.some(x=>x==null)||Number(times[0])!==0))
+    issues.push('For timed image beats, set all story scene start times beginning at 0');
+  if(times.length && times.every(x=>x!=null)&&times.some((x,i)=>i&&Number(x)-Number(times[i-1])<1.2))
+    issues.push('Give each illustrated scene at least 1.2 seconds');
+ }
  try{parseTimedCaptions(p.timedCaptions,p.duration)}catch(err){issues.push(err.message)}
  if(p.aiReview?.required && (!p.aiReview.confirmed || !p.aiReview.claims?.length)) issues.push('Review AI script facts and supporting sources');
  if(!channel(p.channelId)) issues.push('Channel no longer exists');
@@ -469,7 +479,7 @@ function renderBlockers(p){
  if(!Number.isFinite(duration)||duration<3||duration>180||!Number.isFinite(start)||start<0) issues.push('Invalid clip timing');
  return issues;
 }
-function createRenderJob(p){return {version:1,id:p.id,title:p.ytTitle||p.title,kind:p.kind,channel:channel(p.channelId)?.name||'Unassigned',duration:p.duration,source:{path:p.sourcePath||null,url:p.sourceUrl||null,start_seconds:p.start||0},narration:{mode:p.voiceMode||'none',voice:p.voiceName||'af_heart',speed:0.96,sync_captions:true,audio_path:p.audioPath||null},script:p.script||'',caption_segments:parseTimedCaptions(p.timedCaptions,p.duration),captions:Boolean(p.script||p.timedCaptions||p.captionStyle==='hook'),rights_confirmed:true,editing:{caption_style:p.captionStyle||'classic',crop_focus:p.cropFocus||'center',motion:p.motion||'none',background:p.background||'midnight',hook_text:p.hookText||p.title,caption_x:captionPosition(p,p.captionStyle||'classic').x,caption_y:captionPosition(p,p.captionStyle||'classic').y},visuals:{mode:p.visualMode||'classic',theme:p.visualTheme||'aurora',transition:p.visualTransition||'fade',scenes:p.visualScenes||[]},description:p.description||'',generated_at:new Date().toISOString()}}
+function createRenderJob(p){return {version:1,id:p.id,title:p.ytTitle||p.title,kind:p.kind,channel:channel(p.channelId)?.name||'Unassigned',duration:p.duration,source:{path:p.sourcePath||null,url:p.sourceUrl||null,start_seconds:p.start||0},narration:{mode:p.voiceMode||'none',voice:p.voiceName||'af_heart',speed:0.96,sync_captions:true,audio_path:p.audioPath||null},script:p.script||'',caption_segments:parseTimedCaptions(p.timedCaptions,p.duration),captions:Boolean(p.script||p.timedCaptions||p.captionStyle==='hook'),rights_confirmed:true,editing:{caption_style:p.captionStyle||'classic',crop_focus:p.cropFocus||'center',motion:p.motion||'none',background:p.background||'midnight',hook_text:p.hookText||p.title,caption_x:captionPosition(p,p.captionStyle||'classic').x,caption_y:captionPosition(p,p.captionStyle||'classic').y},visuals:{mode:p.visualMode||'classic',intro_seconds:2,theme:p.visualTheme||'aurora',transition:p.visualTransition||'fade',scenes:p.visualScenes||[]},description:p.description||'',generated_at:new Date().toISOString()}}
 function latestRender(p){
  if(!p||!p.lastRender||p.lastRender.fingerprint!==renderFingerprint(p))return null;
  if(!/^\/output\/[0-9a-f]{32}\/[a-z0-9-]{1,50}\.mp4$/.test(p.lastRender.url||''))return null;
@@ -1008,16 +1018,16 @@ function productionPage(){
     ${current.kind==='original'?`<div class="visuals-editor" id="visuals-editor">
       <div class="panel-head"><h3>Original video visuals</h3><span class="tiny-muted">NEW · v0.14</span></div>
       <div class="form-field"><label for="production-visual-mode">Visual treatment</label>
-      <select class="field" id="production-visual-mode"><option value="storyboard" ${current.visualMode==='storyboard'?'selected':''}>Animated multi-scene storyboard</option><option value="classic" ${current.visualMode!=='storyboard'?'selected':''}>Classic single background / supplied footage</option></select></div>
+      <select class="field" id="production-visual-mode"><option value="illustrated" ${(current.visualMode||'illustrated')==='illustrated'?'selected':''}>Illustrated story — cover image, then pictures + captions only</option><option value="storyboard" ${current.visualMode==='storyboard'?'selected':''}>Legacy headline cards</option><option value="classic" ${current.visualMode!=='storyboard'?'selected':''}>Classic single background / supplied footage</option></select></div>
       <div class="production-pair"><div class="form-field"><label for="production-visual-theme">Scene colour palette</label><select class="field" id="production-visual-theme">${[['aurora','Aurora teal'],['ember','Ember orange'],['cosmos','Cosmic violet']].map(([v,l])=>`<option value="${v}" ${current.visualTheme===v?'selected':''}>${l}</option>`).join('')}</select></div>
       <div class="form-field"><label for="production-visual-transition">Scene transitions</label><select class="field" id="production-visual-transition"><option value="fade" ${current.visualTransition!=='cut'?'selected':''}>Soft crossfade</option><option value="cut" ${current.visualTransition==='cut'?'selected':''}>Clean cut</option></select></div></div>
-      <div class="form-field"><label for="production-scenes">Scene headlines — one per line</label><textarea class="field" id="production-scenes" rows="5" maxlength="1600" placeholder="How it all started
+      <div class="form-field"><label for="production-scenes">Story image beats — opening cover first, one picture per next beat</label><textarea class="field" id="production-scenes" rows="5" maxlength="1600" placeholder="How it all started
 A surprising discovery
 What happened next
-Why it matters">${esc((current.visualScenes||[]).map(x=>x.headline+(x.image_path?' | '+x.image_path:'')).join('\n'))}</textarea>
-      <div class="field-help">Each line becomes a scene. Optional: add <code> | path/to/licensed-image.jpg</code> after a headline. Use 1–8 scenes. Leave empty to generate simple headlines from your script. This is a storyboard creator, not AI image generation.</div></div>
-      <div class="production-upload"><input type="file" id="production-scene-image" accept="image/png,image/jpeg,image/webp"><button class="button small" type="button" data-action="production-upload-scene">Add licensed scene image</button><button class="button small button-ghost" type="button" data-action="production-auto-scenes">Suggest scenes from script</button></div>
-      <div class="visual-scene-summary" id="visual-scene-summary">Scenes use your own images or original graphic cards. Preview is indicative; final MP4 includes motion and transitions.</div>
+Why it matters">${esc((current.visualScenes||[]).map(x=>(x.start_seconds==null?'':x.start_seconds+'@')+x.headline+(x.image_path?' | '+x.image_path:'')).join('\n'))}</textarea>
+      <div class="field-help">Use 2–8 scenes: first is a 2-second cover image with the story title, followed by full-screen scene images with NO repeated headlines. Add <code> | user-data/media/image.jpg</code> for each uploaded picture. Optional scene timing: <code>0@Caesar as a child | image.jpg</code>, <code>5@Caesar becomes a soldier | image2.jpg</code>. Starts are seconds into the spoken narration (after the cover). Images must be original or licensed; the app does not generate them yet.</div></div>
+      <div class="production-upload"><input type="file" id="production-scene-image" accept="image/png,image/jpeg,image/webp"><label for="production-scene-number">Scene #</label><input class="field" id="production-scene-number" type="number" min="1" max="8" value="1" style="width:70px"><button class="button small" type="button" data-action="production-upload-scene">Attach image to scene #</button><button class="button small button-ghost" type="button" data-action="production-auto-scenes">Suggest scenes from script</button></div>
+      <div class="visual-scene-summary" id="visual-scene-summary">Image-first mode: cover title once, then pictures only with spoken-word captions. Use licensed images; actual transition timing and visuals appear in the rendered MP4.</div>
     </div>`:''}
     <div class="form-field"><label>Source video (optional for an original)</label><div class="production-upload"><input id="production-file" type="file" accept="video/*,.mp4,.mov,.webm,.m4v"><button class="button small" data-action="production-upload-video" type="button">Use selected video</button><button class="button small button-ghost" data-action="production-demo" type="button">Use demo footage</button>${current.kind==='original'?'<button class="button small button-ghost" data-action="production-generated" type="button">Use generated background</button>':''}</div><div id="production-source" class="tiny-muted">${esc(productionMediaPath(current)||'No source: original videos use a generated background.')}</div></div>
     <div class="form-field"><label>Optional voice recording (WAV/MP3/M4A)</label><div class="production-upload"><input id="production-audio" type="file" accept="audio/*,.wav,.mp3,.m4a"><button class="button small" data-action="production-upload-audio">Use recording</button></div><div class="tiny-muted" id="production-audio-path">${esc(current.audioPath||'None selected')}</div></div>
@@ -1156,8 +1166,8 @@ function productionDraftSave(){
  if(p.kind==='original'){
   const sceneLines=($('#production-scenes')?.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(sceneLines.length>8)throw Error('Use 1–8 scene headlines.');
-  p.visualScenes=sceneLines.map(line=>{const pos=line.indexOf(' | ');const headline=(pos<0?line:line.slice(0,pos)).trim();const image_path=pos<0?'':line.slice(pos+3).trim();if(!headline||headline.length>95)throw Error('Scene headlines must be 1–95 characters.');if(image_path&&!/^(user-data\/media\/|assets\/)[A-Za-z0-9._/-]+\.(jpg|jpeg|png|webp)$/i.test(image_path))throw Error('Image paths must be project-relative JPG, PNG or WebP files.');return {headline,image_path};});
-  p.visualMode=$('#production-visual-mode')?.value||'classic';p.visualTheme=$('#production-visual-theme')?.value||'aurora';p.visualTransition=$('#production-visual-transition')?.value||'fade';
+  p.visualScenes=sceneLines.map(line=>{const pos=line.indexOf(' | ');let headline=(pos<0?line:line.slice(0,pos)).trim();const image_path=pos<0?'':line.slice(pos+3).trim();let start_seconds=null;const match=headline.match(/^([0-9]+(?:\.[0-9]+)?)@(.+)$/);if(match){start_seconds=Number(match[1]);headline=match[2].trim();}if(!headline||headline.length>95)throw Error('Scene descriptions must be 1–95 characters.');if(image_path&&!/^(user-data\/media\/|assets\/)[A-Za-z0-9._/-]+\.(jpg|jpeg|png|webp)$/i.test(image_path))throw Error('Image paths must be project-relative JPG, PNG or WebP files.');return {headline,image_path,start_seconds};});
+  p.visualMode=$('#production-visual-mode')?.value||'illustrated';p.visualTheme=$('#production-visual-theme')?.value||'aurora';p.visualTransition=$('#production-visual-transition')?.value||'fade';
  }
  p.voiceMode=$('#production-voice')?.value||'none';p.voiceName=$('#production-voice-name')?.value||'af_heart';p.captionStyle=$('#production-caption-style')?.value||'classic';p.captionX=captionPosition({captionX:$('#production-caption-x')?.value},p.captionStyle).x;p.captionY=captionPosition({captionY:$('#production-caption-y')?.value},p.captionStyle).y;p.cropFocus=$('#production-crop-focus')?.value||'center';
  p.rights=Boolean($('#production-rights')?.checked);
@@ -1227,8 +1237,8 @@ function productionAutoScenes(){
  if(!sentences.length){notice('Add a narration script first.');return}
  const count=Math.min(5,Math.max(2,sentences.length));
  const headlines=Array.from({length:count},(_,i)=>sentences[Math.min(sentences.length-1,Math.round(i*(sentences.length-1)/Math.max(1,count-1)))].slice(0,90));
- $('#production-scenes').value=headlines.join('\n');$('#production-visual-mode').value='storyboard';
- notice(`${count} editable scene headlines suggested from the script. Review the wording and facts.`);
+ $('#production-scenes').value=['Opening cover — '+($('#production-title')?.value||'Our story').slice(0,60),...headlines].slice(0,8).join('\n');$('#production-visual-mode').value='illustrated';
+ notice('Story beats suggested. Attach one original or licensed illustration to EACH line and review the visual accuracy.');
 }
 async function productionUploadScene(){
  const file=$('#production-scene-image')?.files?.[0];if(!file){notice('Select a JPG, PNG or WebP first.');return}
@@ -1239,10 +1249,11 @@ async function productionUploadScene(){
   const result=await productionAPI('/api/upload',file,file.name);
   const input=$('#production-scenes');const lines=input.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(!lines.length){lines.push('Visual scene');}
-  const last=lines.length-1;
-  lines[last]=lines[last].split(' | ')[0]+' | '+result.path;
-  input.value=lines.join('\n');$('#production-visual-mode').value='storyboard';
-  notice('Licensed image uploaded. Scene path added to the final headline; save the project next.');
+  const selected=Number($('#production-scene-number')?.value||1)-1;
+  if(!Number.isInteger(selected)||selected<0||selected>=lines.length)throw Error('Choose an existing scene number.');
+  lines[selected]=lines[selected].split(' | ')[0]+' | '+result.path;
+  input.value=lines.join('\n');$('#production-visual-mode').value='illustrated';
+  notice('Image attached to scene '+(selected+1)+'. Save your project next.');
  }catch(e){notice('Could not upload scene image: '+e.message)}
 }
 function productionGenerated(){const p=productionProject();if(!p||p.kind!=='original')return;productionStopStoryboard();p.sourcePath='';p.sourceUrl='';productionVideoUrl='';save();if($('#production-source'))$('#production-source').textContent='No source: generated background will be used.';productionRestoreDisplay();notice('Generated background selected for this original video.');}
