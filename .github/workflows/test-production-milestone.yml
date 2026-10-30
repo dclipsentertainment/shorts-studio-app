@@ -7,6 +7,9 @@ on:
       - scripts/local_studio.py
       - scripts/quality_check.py
       - scripts/test_local_production.py
+      - scripts/test_story_duration.py
+      - story-series.js
+      - scripts/test_story_series.js
       - scripts/test_review_gate.js
       - app.js
       - .github/workflows/test-production-milestone.yml
@@ -29,9 +32,12 @@ jobs:
         run: |
           python -m compileall -q scripts
           python scripts/test_local_production.py
+          python scripts/test_story_duration.py
       - name: Verify dashboard JavaScript
         run: |
           node --check app.js
+          node --check story-series.js
+          node scripts/test_story_series.js
           node --check github-usage.js
           node scripts/test_github_usage.js
           node scripts/test_caption_ui.js
