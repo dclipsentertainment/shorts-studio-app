@@ -1,6 +1,6 @@
 # DClips Studio — multi-platform creator workspace
 
-**Current version: v0.14.7 | 30 October 2026**
+**Current version: v0.14.8 | 30 October 2026**
 
 DClips is a four-platform creator workspace for **YouTube Shorts, Instagram Reels, TikTok and Facebook Reels**. The same original 9:16 video can be prepared for each network, with separate account labels, manual performance metrics and earnings tracked by platform.
 
