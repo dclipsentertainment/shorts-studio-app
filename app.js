@@ -562,6 +562,10 @@ function renderBlockers(p){
  if(p.voiceMode==='file'&&!p.audioPath) issues.push('Narration audio file missing');
  if(['basic','kokoro'].includes(p.voiceMode)&&!p.script?.trim()) issues.push('Narration script missing');
  if(p.kind==='original' && /\[(RESEARCH|EXAMPLE|PAYOFF|HOOK|MAIN|END)\]/i.test(p.script||'')) issues.push('Replace research placeholders in the script');
+ if(p.kind==='original' && p.series && !/[.!?]+(?:["'”’])?$/.test(String(p.script||'').trim()))
+  issues.push('Story episode must end at a complete sentence, not an abrupt cut');
+ if(p.kind==='original' && p.series && p.voiceMode==='none')
+  issues.push('Narrated story has no voice: choose an AI narrator or attach a voice recording');
  if(p.kind==='original' && ['storyboard','illustrated'].includes(p.visualMode) && (p.sourcePath||p.sourceUrl)) issues.push('Storyboard needs generated background: click Use generated background in Production flow');
  if(p.kind==='original' && ['storyboard','illustrated'].includes(p.visualMode) && p.visualScenes?.length && Number(p.duration)/p.visualScenes.length<1.2) issues.push('Storyboard scenes too short: use fewer scenes or a longer video');
  if(p.kind==='original' && p.visualMode==='illustrated'){
@@ -1193,6 +1197,7 @@ Why it matters">${esc((current.visualScenes||[]).map(x=>(x.start_seconds==null?'
    ${!last.approved?`<p class="secondary-note">Watch the finished MP4 above, not just the editing preview. Confirm each item before approval:</p>
    <div class="review-checks">
     <label class="checkbox-row"><input type="checkbox" id="review-watched"> I watched and listened to the completed MP4, including the beginning and ending.</label>
+    ${current?.series?'<label class="checkbox-row"><input type="checkbox" id="review-ending"> The episode closes on a complete thought, narration and captions finish together, and the next part continues logically.</label>':''}
     <label class="checkbox-row"><input type="checkbox" id="review-captions"> All spoken words, captions, headline and scene changes are accurate and timed correctly.</label>
     <label class="checkbox-row"><input type="checkbox" id="review-rights"> I checked footage, streamer consent/licence, music, voices and any visible people; I have appropriate usage rights.</label>
     <label class="checkbox-row"><input type="checkbox" id="review-final"> I reviewed factual claims and platform-specific originality requirements. I approve this specific video for manual handoff.</label>
@@ -1470,7 +1475,7 @@ function productionApprove(){
  if(last.quality?.status==='fail'||!last.quality){notice('A passing technical quality report is required.');return}
  const issues=renderBlockers(p);
  if(issues.length){notice('Review blocked: '+issues[0]);return}
- const ids=['review-watched','review-captions','review-rights','review-final'];
+ const ids=['review-watched','review-captions','review-rights','review-final'];if(p.series)ids.push('review-ending');
  if(!ids.every(id=>document.getElementById(id)?.checked)){notice('Complete all four review checks first.');return}
  last.approved=true;last.approvedAt=new Date().toISOString();
  if(!save()){last.approved=false;notice('Review could not be saved.');return}
