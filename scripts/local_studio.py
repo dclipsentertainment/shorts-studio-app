@@ -29,7 +29,7 @@ TASKS = {}
 LOCK = threading.Lock()
 
 CONTENT_TYPES = {'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.png':'image/png','.json':'application/json; charset=utf-8','.srt':'text/plain; charset=utf-8'}
-ALLOWED_STATIC = {'/','/index.html','/app.js','/styles.css','/assets/example-background.mp4'}
+ALLOWED_STATIC = {'/','/index.html','/app.js','/github-usage.js','/styles.css','/assets/example-background.mp4'}
 MEDIA_EXTS = {'.mp4','.mov','.m4v','.webm','.mp3','.wav','.m4a','.png','.jpg','.jpeg','.webp'}
 
 
@@ -116,6 +116,18 @@ def begin_task(job, kind):
                         else: value['warning']='No speech was recognised; estimated captions kept.'
                     except Exception as exc:
                         value['warning']='Speech alignment was unavailable: '+str(exc)[-170:]
+
+                # Validate the finished file itself, not merely the input job.
+                # These checks cover MP4 format/codec/resolution, not rights or originality.
+                from quality_check import check_video
+                quality = check_video(result)
+                value['quality_report'] = quality
+                (RENDERS / task_id / 'quality-report.json').write_text(
+                    json.dumps(quality, indent=2) + '\n', encoding='utf-8')
+                if quality['status'] == 'fail':
+                    value['warning'] = 'Technical quality check failed; do not approve this video.'
+                elif quality['warnings']:
+                    value['warning'] = '; '.join(quality['warnings'][:3])
 
             else:
                 from transcribe import transcribe
