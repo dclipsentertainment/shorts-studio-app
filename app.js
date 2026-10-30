@@ -6,7 +6,7 @@
 const STORE_KEY = 'shorts_studio_state_v1';
 const RECOVERY_KEY = 'shorts_studio_recovery_v1';
 const APP_VERSION = '0.14.10';
-const views = {overview:'Overview',channels:'Channels',production:'Production flow',series:'Story series planner',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',live:'Live stream monitor',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',usage:'GitHub usage',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
+const views = {quick:'Quick Create',overview:'Overview',channels:'Channels',production:'Production flow',series:'Story series planner',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',live:'Live stream monitor',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',usage:'GitHub usage',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
 const palettes = ['#8c7aff','#ef7ab6','#50bdc3','#e9a868','#5abb92','#6b95f1'];
 const initial = () => ({version:1,channels:[],projects:[],scoutReports:[],trends:[],discovery:null,streamers:[],viralThreshold:100000,createdAt:new Date().toISOString(),demo:false});
 const $ = s => document.querySelector(s);
@@ -23,6 +23,10 @@ let page = (location.hash.replace('#','') in views) ? location.hash.slice(1) : '
 let filter = 'all';
 let discoveryNiche='all';
 let aiDraft = null;
+let quickBrief = null;
+let quickPack = null;
+let quickPrompt = '';
+let quickJson = '';
 let seriesDraft = null;
 let seriesPreview = null;
 let watchedSeriesRenderKey = ''; // Unlocked after completed playback of the rendered episode.
@@ -82,7 +86,7 @@ function render(){
  $('#today-date').textContent=new Date().toLocaleDateString('en-IE',{weekday:'short',day:'numeric',month:'short'});
  $('#crumb-current').textContent=views[page];
  document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===page));
- const main=$('#main');main.innerHTML=({overview:overview,channels:channelsPage,production:productionPage,series:seriesPage,studio:studioPage,queue:queuePage,scout:scoutPage,live:liveMonitorPage,radar:radarPage,discover:discoverPage,analytics:analyticsPage,usage:window.DClipsUsageMonitor.render,growth:growthPage,creative:creativePage,ai:aiDeskPage,preview:previewPage,quality:qualityPage,competitors:competitorsPage,setup:setupPage}[page])();
+ const main=$('#main');main.innerHTML=({quick:quickPage,overview:overview,channels:channelsPage,production:productionPage,series:seriesPage,studio:studioPage,queue:queuePage,scout:scoutPage,live:liveMonitorPage,radar:radarPage,discover:discoverPage,analytics:analyticsPage,usage:window.DClipsUsageMonitor.render,growth:growthPage,creative:creativePage,ai:aiDeskPage,preview:previewPage,quality:qualityPage,competitors:competitorsPage,setup:setupPage}[page])();
  if(page==='usage')window.DClipsUsageMonitor.afterRender();
  if(page==='preview')previewRestoreDisplay();
  if(page==='production'){productionRestoreDisplay();productionCheckBackend();}
@@ -113,6 +117,99 @@ function channelsPage(){return `${heading('BRANDS & ACCOUNTS','Your channels','M
  ${state.channels.length?`<div class="channel-grid">${state.channels.map(channelCard).join('')}</div>`:empty('◎','No channel groups yet','Create one brand for each type of content.','Create a channel','new-channel')}
  <h2 class="section-title">Recommended structure</h2><div class="panel"><p class="secondary-note">Use one content brand across YouTube Shorts, Instagram Reels, TikTok and Facebook Reels. Keep each platform handle and performance figure separate; publishing rights and monetisation eligibility vary by platform.</p></div>`}
 
+function quickPage(){
+ const b=quickBrief||{};
+ const plan=quickPack?window.DClipsSeries.plan({title:quickPack.title,script:quickPack.script,wpm:145,platforms:['YT','IG','TT','FB']}):null;
+ return `${heading('ONE-IDEA CREATOR','Quick Create','Enter your story title and, if you want, a short description. DClips prepares everything else for you to review.')}
+ <section class="panel" style="margin-bottom:20px"><div class="panel-head"><h2>1 · Your idea</h2><span class="tiny-muted">ONLY THE TITLE IS REQUIRED</span></div>
+ <div class="form-field"><label for="quick-title">Story title</label><input class="field" id="quick-title" value="${esc(b.title||'')}" maxlength="150" placeholder="e.g. The Life of Julius Caesar"></div>
+ <div class="form-field" style="margin-top:13px"><label for="quick-description">Short description <span class="tiny-muted">(optional)</span></label><textarea class="field" id="quick-description" rows="3" maxlength="600" placeholder="Optional: what should the story focus on? Leave blank and let ChatGPT decide.">${esc(b.description||'')}</textarea></div>
+ <div class="preview-actions" style="margin-top:14px"><button type="button" class="button button-primary" data-action="quick-prepare">✦ Prepare my story with ChatGPT</button></div>
+ <p class="footnote">No script, episode counts, scene timings, narrator or platform choices to fill in. ChatGPT creates the story package; DClips calculates the video plan automatically. Your ChatGPT account still requires a brief copy/paste handoff because it cannot be called directly from this free website.</p></section>
+ ${quickPrompt?`<section class="panel" style="margin-bottom:20px"><div class="panel-head"><h2>2 · Get your complete story from ChatGPT</h2><span class="tiny-muted">NO EXTRA IMAGE API CHARGES</span></div>
+ <p class="secondary-note">Copy this prepared request and open ChatGPT. Ask it to return one JSON story package. Then paste the entire response below. You do not have to write the script or plan scenes yourself.</p>
+ <div class="form-field"><label for="quick-prompt">Your automatically prepared request</label><textarea id="quick-prompt" class="field ai-code" rows="7" spellcheck="false" readonly>${esc(quickPrompt)}</textarea></div>
+ <div class="split-buttons" style="margin-top:12px"><button type="button" class="button button-primary" data-action="quick-copy">Copy ChatGPT request</button><a href="https://chatgpt.com/" class="button button-ghost" target="_blank" rel="noopener noreferrer">Open ChatGPT ↗</a></div>
+ <div class="form-field" style="margin-top:20px"><label for="quick-json">Paste completed story package</label><textarea id="quick-json" class="field ai-code" rows="7" spellcheck="false" placeholder="Paste the JSON from ChatGPT here, then click Review story.">${esc(quickJson)}</textarea></div>
+ <button type="button" class="button button-primary" data-action="quick-review" style="margin-top:12px">✓ Review generated story</button>
+ </section>`:''}
+ ${quickPack&&plan?`<section class="panel" style="margin-bottom:20px"><div class="panel-head"><h2>3 · Review your generated story</h2><span class="tiny-muted">NOT APPROVED OR PUBLISHED</span></div>
+ <div class="notice"><strong>${esc(quickPack.title)}</strong> · ${quickPack.words} words · ~${Math.round(quickPack.estimatedSeconds/60*10)/10} min · ${esc(quickPack.type)}. All information, images and audio require human review before final publishing.</div>
+ <h3 style="margin-top:18px">Full narration</h3><pre class="creative-script ai-script-preview">${esc(quickPack.script)}</pre>
+ <h3 style="margin-top:18px">Chronological illustration plan · ${quickPack.scenes.length} beats</h3>
+ <div class="series-parts">${quickPack.scenes.map((scene,i)=>`<article class="series-part"><div><strong>Scene ${i+1}</strong><small>${esc(scene.quote)}</small></div><p>${esc(scene.visual)}</p></article>`).join('')}</div>
+ <div class="secondary-note" style="margin-top:12px"><strong>Art direction:</strong> ${esc(quickPack.illustrationStyle)}</div>
+ <h3 style="margin-top:18px">Automatic platform recommendations</h3>
+ <div class="series-platform-grid">${plan.platforms.map(v=>`<div class="series-platform"><strong>${esc(v.name)}</strong><p>${v.partCount} ${v.partCount===1?'video':'parts'} · target ${v.target}s each</p></div>`).join('')}</div>
+ ${quickPack.claims.length?`<h3 style="margin-top:18px">Sources to verify</h3><div class="claim-list">${quickPack.claims.map(c=>`<p>${esc(c.claim)} <a target="_blank" rel="noopener noreferrer" href="${esc(c.source_url)}">Review source ↗</a></p>`).join('')}</div>`:''}
+ <p class="secondary-note">${esc(quickPack.reviewNotes||'Check narration, every visual scene and factual claims before publishing.')}</p>
+ <p class="footnote">Creating drafts automatically adds narration, scene descriptions, recommended parts and estimated timings. AI illustrations are not yet attached and no video has been rendered. You can edit everything after creation.</p>
+ <button type="button" class="button button-primary" data-action="quick-create">＋ Create editable video drafts</button>
+ </section>`:''}`;
+}
+function quickPrepare(){
+ try{
+  if(!window.DClipsQuick)throw Error('Quick Create helper is missing. Reload DClips.');
+  const title=($('#quick-title')?.value||'').trim(),description=($('#quick-description')?.value||'').trim();
+  const generated=window.DClipsQuick.prompt(title,description);
+  quickBrief={title,description};
+  quickPrompt=generated;quickPack=null;quickJson='';
+  render();
+  copyText(generated);
+  notice('Your ChatGPT request is ready. Open ChatGPT and paste it; then return with the JSON story.');
+ }catch(e){notice(e.message);}
+}
+function quickReview(){
+ try{
+  quickJson=$('#quick-json')?.value||'';
+  quickPack=window.DClipsQuick.parse(quickJson);
+  if(!quickBrief)throw Error('Prepare a title first.');
+  const plan=window.DClipsSeries.plan({title:quickPack.title,script:quickPack.script,wpm:145,platforms:['YT','IG','TT','FB']});
+  const count=plan.platforms.reduce((n,x)=>n+x.partCount,0);
+  if(count>80)throw Error('This story would create too many drafts. Ask ChatGPT to shorten the story.');
+  render();notice('Story and scene plan ready for review. Nothing has been published or billed.');
+ }catch(e){quickPack=null;notice('Story response needs correction: '+e.message);}
+}
+function quickCreate(){
+ try{
+  if(!quickBrief||!quickPack)throw Error('Prepare and review the ChatGPT story first.');
+  const plan=window.DClipsSeries.plan({title:quickPack.title,script:quickPack.script,wpm:145,platforms:['YT','IG','TT','FB']});
+  const count=plan.platforms.reduce((sum,v)=>sum+v.partCount,0);
+  if(count>80||state.projects.length+count>10000)throw Error('Too many generated drafts. Shorten the story.');
+  if((state.seriesPlans||[]).length>=35)throw Error('Maximum 35 saved series. Back up your workspace first.');
+  const before=JSON.stringify(state),now=new Date().toISOString();
+  if(!state.channels.length)state.channels.push({id:uid(),name:'DClips Entertainment',niche:'Original narrated stories',color:palettes[0],notes:'Created automatically by Quick Create',createdAt:now});
+  const ch=state.channels[0],seriesId=uid(),projects=[];
+  for(const variant of plan.platforms){
+   for(const part of variant.parts){
+    const visualScenes=window.DClipsQuick.scenesForPart(quickPack,part,part.label);
+    projects.push({id:uid(),title:part.label,kind:'original',channelId:ch.id,status:'draft',
+     script:part.script,description:'',notes:'Quick Create story: '+(quickBrief.description||quickBrief.title)+'. '+(quickPack.reviewNotes||'')+
+      ' Review source facts, narration and scene illustrations before publishing.',
+     duration:Math.max(8,Math.min(600,Math.ceil(part.seconds+2.5))),start:0,sourcePath:'',sourceUrl:'',
+     voiceMode:'kokoro',voiceName:'am_michael',captionStyle:'kinetic',captionX:50,captionY:75,
+     visualMode:'illustrated',visualTheme:'cosmos',visualTransition:'fade',
+     visualScenes,sceneTimingReference:Math.max(5,part.seconds),scenePlanText:visualScenes.map(v=>v.headline),
+     illustrationStyle:quickPack.illustrationStyle,rights:false,timedCaptions:'',
+     aiReview:{required:true,requiresSources:quickPack.type==='factual',confirmed:false,
+      claims:quickPack.claims,origin:'Title-first manual ChatGPT story import',createdAt:now,reviewedAt:null},
+     series:{id:seriesId,title:quickPack.title,platform:variant.id,part:part.number,
+      total:part.total,estimatedSeconds:part.seconds,revision:1},
+     createdAt:now,updatedAt:now});
+   }
+  }
+  const record={id:seriesId,title:quickPack.title,masterScript:quickPack.script,wpm:145,
+   channelId:ch.id,createdAt:now,projectCount:projects.length,description:quickBrief.description,
+   storyType:quickPack.type,illustrationStyle:quickPack.illustrationStyle,
+   variants:plan.platforms.map(v=>({platform:v.id,mode:v.mode,count:v.partCount,target:v.target,revision:1}))};
+  state.projects.push(...projects);if(!Array.isArray(state.seriesPlans))state.seriesPlans=[];
+  state.seriesPlans.push(record);
+  if(!save()){state=JSON.parse(before);throw Error('Could not save projects. Export a backup.');}
+  quickPack=null;quickPrompt='';quickJson='';quickBrief=null;
+  navigate('studio');
+  notice('Created '+projects.length+' story drafts, including scene plans. Add ChatGPT illustrations and review before rendering.');
+ }catch(e){notice(e.message);}
+}
 function seriesPage(){
  const defaults={title:'',script:'',wpm:145,channelId:state.channels[0]?.id||'',
   enabled:{IG:true,YT:true,TT:true,FB:true},conf:{}};
@@ -579,7 +676,7 @@ function renderBlockers(p){
     issues.push('Give each illustrated scene at least 1.2 seconds');
  }
  try{parseTimedCaptions(p.timedCaptions,p.duration)}catch(err){issues.push(err.message)}
- if(p.aiReview?.required && (!p.aiReview.confirmed || !p.aiReview.claims?.length)) issues.push('Review AI script facts and supporting sources');
+ if(p.aiReview?.required && (!p.aiReview.confirmed || (p.aiReview.requiresSources!==false && !p.aiReview.claims?.length))) issues.push('Review AI script facts and supporting sources');
  if(!channel(p.channelId)) issues.push('Channel no longer exists');
  const duration=Number(p.duration),start=Number(p.start||0);
  if(!Number.isFinite(duration)||duration<3||duration>(p.kind==='original'?600:180)||!Number.isFinite(start)||start<0) issues.push('Duration exceeds the allowed limit for this video type');
@@ -1067,7 +1164,7 @@ function suggestScript(){const title=str($('#field-title')?.value)||'your topic'
  target.value=`[HOOK] Here is something interesting about ${title}.\n\n[MAIN] Explain the most surprising fact in your own words. Include a verifiable source and an example.\n\n[END] What do you think?`;
  notice('Starter outline added. Replace the placeholders with a researched, original script.');}
 function downloadText(filename,text){const blob=new Blob([text],{type:'text/plain;charset=utf-8'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),3000)}
-async function copyText(text){try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);notice('Copied.');return}throw Error('fallback')}catch(e){const t=$('#ai-prompt');if(t&&t.value===text){t.focus();t.select();notice('Prompt selected. Press Ctrl+C to copy.')}else notice('Clipboard unavailable: select and copy the text manually.')}}
+async function copyText(text){try{if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);notice('Copied.');return}throw Error('fallback')}catch(e){const t=$('#ai-prompt')?.value===text?$('#ai-prompt'):$('#quick-prompt');if(t&&t.value===text){t.focus();t.select();notice('Prompt selected. Press Ctrl+C to copy.')}else notice('Clipboard unavailable: select and copy the text manually.')}}
 // v0.12 · Unified production flow. Optional loopback-only Python bridge.
 let productionProjectId='';
 let productionCues=[];
@@ -1599,7 +1696,7 @@ function productionRebalanceSeries(){
  }catch(e){notice(e.message);}
 }
 function handleClick(ev){let nav=ev.target.closest('[data-nav]');if(nav){navigate(nav.dataset.nav);return}let btn=ev.target.closest('[data-action]');if(!btn)return;let action=btn.dataset.action,id=btn.dataset.id;
- switch(action){case 'production-series-rebalance':productionRebalanceSeries();break;case 'series-preview':seriesPreviewAction();break;case 'series-create':seriesCreate();break;case 'series-example':seriesExample();break;case 'series-show-drafts':seriesShowDrafts(id);break;case 'production-approve':productionApprove();break;case 'live-plan':livePlan(id);break;case 'live-delete':state.streamers=(state.streamers||[]).filter(w=>w.id!==id);save();render();notice('Streamer removed.');break;case 'production-remove-commentary':productionRemoveCommentary();break;case 'production-apply-text':productionApplyText();break;case 'production-center-text':moveTextInput('production',true);break;case 'production-play':productionPlayStoryboard();break;case 'production-stop':productionStopStoryboard();break;case 'production-save':productionSave();break;case 'production-estimate':productionEstimate();break;case 'production-upload-video':productionUpload('file');break;case 'production-upload-audio':productionUpload('audio');break;case 'production-demo':productionDemo();break;case 'production-auto-scenes':productionAutoScenes();break;case 'production-create-art':productionGenerateSceneImages();break;case 'production-upload-scene':productionUploadScene();break;case 'production-generated':productionGenerated();break;case 'production-transcribe':productionTranscribe();break;case 'production-import-cues':$('#production-cue-file')?.click();break;case 'production-add-cue':{const t=productionCues.at(-1)?.end_seconds||0;const len=Number($('#production-length')?.value)||30;if(t<len-.1){productionCues.push({start_seconds:t,end_seconds:Math.min(t+1.5,len),text:'New caption'});productionPaint()}break;}case 'production-remove-cue':productionCues.splice(Number(btn.dataset.index),1);productionPaint();break;case 'production-seek':{const vid=$('#production-video');const cue=productionCues[Number(btn.dataset.index)];if(vid&&cue)vid.currentTime=(Number($('#production-start')?.value)||0)+cue.start_seconds;break;}case 'production-render':productionRender();break;case 'production-export':productionExport();break;case 'new-channel':openChannel();break;case 'edit-channel':openChannel(id);break;case 'new-content':openProject(null,{channelId:btn.dataset.channel,kind:btn.dataset.kind});break;case 'edit-content':openProject(id);break;case 'preview-project':previewSelectProject(id);navigate('preview');break;case 'preview-demo':previewDemo();break;case 'preview-add':previewAddCue();break;case 'preview-seek-start':{let v=$('#preview-video');if(v&&v.readyState)v.currentTime=previewStart();break;}case 'preview-jump':{let v=$('#preview-video'),c=previewSegments[Number(btn.dataset.index)];if(v?.readyState&&c)v.currentTime=previewStart()+c.start_seconds;break;}case 'preview-remove':previewSegments.splice(Number(btn.dataset.index),1);previewPaintCues();break;case 'preview-apply-text':previewApplyText();break;case 'preview-center-text':moveTextInput('preview',true);break;case 'preview-remove-voice':previewRemoveCommentary();break;case 'preview-save':previewSave();break;case 'preview-export-srt':previewExportSRT();break;case 'preview-export-json':previewExportJSON();break;case 'preview-export-job':{if(previewProject())jobExport(previewProjectId);break;}case 'close-modal':$('#modal').close();break;case 'go-studio':navigate('studio');break;case 'export-job':jobExport(id);break;case 'export-batch':exportRenderBatch();break;case 'restore-recovery':restoreRecovery(Number(btn.dataset.index));break;case 'backup':downloadJSON(`shorts-studio-backup-${new Date().toISOString().slice(0,10)}.json`,state);notice('Backup downloaded.');break;case 'import':$('#import-file').click();break;case 'import-scout':$('#scout-file').click();break;case 'import-trends':$('#trend-file').click();break;case 'import-discovery':$('#discovery-file').click();break;case 'export-discovery':if(state.discovery)downloadJSON('youtube-discovery-ranked.json',state.discovery);break;case 'track-discovery':trackDiscovery(id);break;case 'idea-discovery':trackDiscovery(id,true);break;case 'new-trend':openTrend();break;case 'edit-trend':openTrend(id);break;case 'delete-trend':deleteTrend(id);break;case 'idea-trend':ideaTrend(id);break;case 'export-trends':exportTrends();break;case 'export-growth':exportGrowth();break;case 'add-candidate':addCandidate(id,Number(btn.dataset.index));break;case 'demo':doDemo();break;case 'reset':if(confirm('Delete all channels, projects, trend watchlists and manual stats in this browser? This cannot be undone.')){state=initial();save();render();notice('Local workspace reset.')}break;case 'delete-channel':if(confirm('Delete this channel and all its projects?')){state.channels=state.channels.filter(x=>x.id!==id);state.projects=state.projects.filter(x=>x.channelId!==id);$('#modal').close();save();render()}break;case 'delete-project':if(confirm('Delete this project?')){state.projects=state.projects.filter(x=>x.id!==id);$('#modal').close();save();render()}break;case 'script-starter':suggestScript();break;case 'generate-concept':generateConcept();break;case 'ai-load-project':loadAiProject();break;case 'ai-existing':{if($('#modal').open)$('#modal').close();let p=state.projects.find(x=>x.id===id);aiPrefill=p?{topic:p.title,angle:(p.notes||'').slice(0,600),mode:p.kind,channelId:p.channelId,projectId:p.id}:null;navigate('ai');break;}case 'ai-build-prompt':buildAiPrompt();break;case 'ai-copy-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)copyText(t);break;}case 'ai-download-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)downloadText('chatgpt-shorts-prompt.txt',t);break;}case 'ai-preview':previewAiReply();break;case 'ai-save-draft':saveAiDraft();break;case 'ai-import-file':$('#ai-file').click();break;case 'save-concept':saveConcept(Number(btn.dataset.index));break;case 'copy-caption':{let p=state.projects.find(x=>x.id===id);if(p)copyText([p.ytTitle||p.title,p.description].filter(Boolean).join('\n\n'));break;}}
+ switch(action){case 'quick-open':navigate('quick');break;case 'quick-prepare':quickPrepare();break;case 'quick-copy':if(quickPrompt)copyText(quickPrompt);break;case 'quick-review':quickReview();break;case 'quick-create':quickCreate();break;case 'production-series-rebalance':productionRebalanceSeries();break;case 'series-preview':seriesPreviewAction();break;case 'series-create':seriesCreate();break;case 'series-example':seriesExample();break;case 'series-show-drafts':seriesShowDrafts(id);break;case 'production-approve':productionApprove();break;case 'live-plan':livePlan(id);break;case 'live-delete':state.streamers=(state.streamers||[]).filter(w=>w.id!==id);save();render();notice('Streamer removed.');break;case 'production-remove-commentary':productionRemoveCommentary();break;case 'production-apply-text':productionApplyText();break;case 'production-center-text':moveTextInput('production',true);break;case 'production-play':productionPlayStoryboard();break;case 'production-stop':productionStopStoryboard();break;case 'production-save':productionSave();break;case 'production-estimate':productionEstimate();break;case 'production-upload-video':productionUpload('file');break;case 'production-upload-audio':productionUpload('audio');break;case 'production-demo':productionDemo();break;case 'production-auto-scenes':productionAutoScenes();break;case 'production-create-art':productionGenerateSceneImages();break;case 'production-upload-scene':productionUploadScene();break;case 'production-generated':productionGenerated();break;case 'production-transcribe':productionTranscribe();break;case 'production-import-cues':$('#production-cue-file')?.click();break;case 'production-add-cue':{const t=productionCues.at(-1)?.end_seconds||0;const len=Number($('#production-length')?.value)||30;if(t<len-.1){productionCues.push({start_seconds:t,end_seconds:Math.min(t+1.5,len),text:'New caption'});productionPaint()}break;}case 'production-remove-cue':productionCues.splice(Number(btn.dataset.index),1);productionPaint();break;case 'production-seek':{const vid=$('#production-video');const cue=productionCues[Number(btn.dataset.index)];if(vid&&cue)vid.currentTime=(Number($('#production-start')?.value)||0)+cue.start_seconds;break;}case 'production-render':productionRender();break;case 'production-export':productionExport();break;case 'new-channel':openChannel();break;case 'edit-channel':openChannel(id);break;case 'new-content':openProject(null,{channelId:btn.dataset.channel,kind:btn.dataset.kind});break;case 'edit-content':openProject(id);break;case 'preview-project':previewSelectProject(id);navigate('preview');break;case 'preview-demo':previewDemo();break;case 'preview-add':previewAddCue();break;case 'preview-seek-start':{let v=$('#preview-video');if(v&&v.readyState)v.currentTime=previewStart();break;}case 'preview-jump':{let v=$('#preview-video'),c=previewSegments[Number(btn.dataset.index)];if(v?.readyState&&c)v.currentTime=previewStart()+c.start_seconds;break;}case 'preview-remove':previewSegments.splice(Number(btn.dataset.index),1);previewPaintCues();break;case 'preview-apply-text':previewApplyText();break;case 'preview-center-text':moveTextInput('preview',true);break;case 'preview-remove-voice':previewRemoveCommentary();break;case 'preview-save':previewSave();break;case 'preview-export-srt':previewExportSRT();break;case 'preview-export-json':previewExportJSON();break;case 'preview-export-job':{if(previewProject())jobExport(previewProjectId);break;}case 'close-modal':$('#modal').close();break;case 'go-studio':navigate('studio');break;case 'export-job':jobExport(id);break;case 'export-batch':exportRenderBatch();break;case 'restore-recovery':restoreRecovery(Number(btn.dataset.index));break;case 'backup':downloadJSON(`shorts-studio-backup-${new Date().toISOString().slice(0,10)}.json`,state);notice('Backup downloaded.');break;case 'import':$('#import-file').click();break;case 'import-scout':$('#scout-file').click();break;case 'import-trends':$('#trend-file').click();break;case 'import-discovery':$('#discovery-file').click();break;case 'export-discovery':if(state.discovery)downloadJSON('youtube-discovery-ranked.json',state.discovery);break;case 'track-discovery':trackDiscovery(id);break;case 'idea-discovery':trackDiscovery(id,true);break;case 'new-trend':openTrend();break;case 'edit-trend':openTrend(id);break;case 'delete-trend':deleteTrend(id);break;case 'idea-trend':ideaTrend(id);break;case 'export-trends':exportTrends();break;case 'export-growth':exportGrowth();break;case 'add-candidate':addCandidate(id,Number(btn.dataset.index));break;case 'demo':doDemo();break;case 'reset':if(confirm('Delete all channels, projects, trend watchlists and manual stats in this browser? This cannot be undone.')){state=initial();save();render();notice('Local workspace reset.')}break;case 'delete-channel':if(confirm('Delete this channel and all its projects?')){state.channels=state.channels.filter(x=>x.id!==id);state.projects=state.projects.filter(x=>x.channelId!==id);$('#modal').close();save();render()}break;case 'delete-project':if(confirm('Delete this project?')){state.projects=state.projects.filter(x=>x.id!==id);$('#modal').close();save();render()}break;case 'script-starter':suggestScript();break;case 'generate-concept':generateConcept();break;case 'ai-load-project':loadAiProject();break;case 'ai-existing':{if($('#modal').open)$('#modal').close();let p=state.projects.find(x=>x.id===id);aiPrefill=p?{topic:p.title,angle:(p.notes||'').slice(0,600),mode:p.kind,channelId:p.channelId,projectId:p.id}:null;navigate('ai');break;}case 'ai-build-prompt':buildAiPrompt();break;case 'ai-copy-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)copyText(t);break;}case 'ai-download-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)downloadText('chatgpt-shorts-prompt.txt',t);break;}case 'ai-preview':previewAiReply();break;case 'ai-save-draft':saveAiDraft();break;case 'ai-import-file':$('#ai-file').click();break;case 'save-concept':saveConcept(Number(btn.dataset.index));break;case 'copy-caption':{let p=state.projects.find(x=>x.id===id);if(p)copyText([p.ytTitle||p.title,p.description].filter(Boolean).join('\n\n'));break;}}
 }
 // Drag caption text directly on the video. Save coordinates with each project's final render job.
 document.addEventListener('pointerdown',ev=>{
