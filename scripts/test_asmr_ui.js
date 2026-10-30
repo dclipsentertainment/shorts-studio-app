@@ -11,13 +11,15 @@ for(const [profile,title] of Object.entries(samples)){
  assert.equal(job.profile,profile);
  assert.equal(job.duration,16);
  assert.equal(job.kind,'asmr');
- assert.equal(job.version,2);
+ assert.equal(job.version,3);
  assert.equal(job.review_required,true);
- assert.equal(job.audio_style,'layered-foley-v2');
- assert.equal(job.visual_style,'cinematic-procedural-v2');
+ assert.equal(job.audio_style,'action-synced-foley-v3');
+ assert.equal(job.visual_style,'asmr-pro-shot-sequencer-v3');
  assert(['mint','rose','lavender','amber'].includes(job.colorway));
  assert(['gentle','balanced','crisp'].includes(job.sound_intensity));
  assert.equal(asmr.describe(job).profile,profile);
+ assert.equal(asmr.describe(job).sequence.length,4);
+ assert.equal(asmr.describe(job).sequence[3].end,16);
 }
 assert.equal(asmr.prepare('A relaxing satisfying loop').profile,'slime');
 assert.equal(asmr.prepare('Watch something satisfying','Soft soap carving').profile,'soap');
@@ -61,6 +63,9 @@ w.__testASMR.asmrPlanAction();
 assert.equal(w.__testASMR.readPlan().profile,'bubbles');
 assert(elements.main.innerHTML.includes('Approve concept'));
 assert(elements.main.innerHTML.includes('stereo Foley'));
+assert(elements.main.innerHTML.includes('Automatic four-shot plan'));
+assert(elements.main.innerHTML.includes('Payoff and reset'));
+
 assert(elements.main.innerHTML.includes('colourway'));
 assert(elements.main.innerHTML.includes('Original')||elements.main.innerHTML.includes('original'));
 assert.equal(JSON.parse(stored).projects.length,0,'ASMR generation should not silently publish or modify story drafts');

@@ -200,8 +200,9 @@
    const components=name.split('/');
    if(components.length>3||components.some(x=>!x||x==='..'||x==='.'))throw Error('Unsafe artifact ZIP path.');
    const basename=components.at(-1);
-   const isVideo=/\.mp4$/i.test(basename),isQuality=basename==='quality-report.json';
-   if(!isVideo&&!isQuality)throw Error('GitHub artifact contains an unexpected file.');
+   const isVideo=/\.mp4$/i.test(basename),isQuality=basename==='quality-report.json',
+    isShotPlan=basename==='asmr-shot-plan.json';
+   if(!isVideo&&!isQuality&&!isShotPlan)throw Error('GitHub artifact contains an unexpected file.');
    if(isVideo&&mp4)throw Error('GitHub artifact must contain exactly one MP4.');
    const max=isVideo?MAX_VIDEO:100000;
    if(clen>max||ulen>max||(!isVideo&&ulen<2)||local>=start||local+30>bytes.length||rd32(local)!==0x04034b50)
@@ -210,7 +211,7 @@
    if(dataStart+clen>start||rd16(local+6)!==flags||rd16(local+8)!==method||
       decoder.decode(bytes.subarray(local+30,local+30+lname))!==name)
     throw Error('Artifact ZIP file header mismatch.');
-   if(!isVideo)continue; // Quality report remains informational; never auto-approves content.
+   if(!isVideo)continue; // Quality/shot-plan reports are informational; never auto-approve content.
    const payload=bytes.subarray(dataStart,dataStart+clen);
    let output;
    if(method===0)output=new Uint8Array(payload);
