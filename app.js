@@ -140,22 +140,22 @@ function channelsPage(){return `${heading('BRANDS & ACCOUNTS','Your channels','M
 function asmrPage(){
  const ready=asmrPlan&&window.DClipsASMR?.describe(asmrPlan);
  const src=asmrPreviewUrl;
- return `${heading('NO GPU · ORIGINAL SOUND & VISUALS','Satisfying ASMR','Enter a title, add an optional description, and let DClips choose the visuals and sounds automatically.')}
+ return `${heading('NO GPU · ORIGINAL SOUND & VISUALS','Satisfying ASMR','Enter a title and optionally a description. DClips builds a more detailed macro-style animation with synchronized stereo sounds automatically.')}
  <section class="panel">
   <div class="panel-head"><h2>1 · Describe the ASMR</h2><span class="tiny-muted">TITLE ONLY REQUIRED</span></div>
   <div class="form-field"><label for="asmr-title">Video title</label><input id="asmr-title" class="field" maxlength="150" value="${esc(asmrTitle)}" placeholder="e.g. Squishing translucent slime"></div>
   <div class="form-field" style="margin-top:12px"><label for="asmr-description">Small description <span class="tiny-muted">(optional)</span></label>
   <textarea id="asmr-description" class="field" maxlength="600" rows="3" placeholder="e.g. Soft blue slime, slow satisfying squishes">${esc(asmrDescription)}</textarea></div>
   <button type="button" class="button button-primary" data-action="asmr-plan" style="margin-top:12px">✦ Generate ASMR concept</button>
-  <p class="footnote">DClips automatically selects a 16-second original vertical animation with synchronized sounds, without paid AI video APIs or software running on your computer.</p>
+  <p class="footnote">DClips creates a 16-second, 24 fps, original vertical video concept with material textures, smooth camera movement and action-synchronised stereo sounds, entirely on GitHub Actions.</p>
  </section>
  ${ready?`<section class="panel" style="margin-top:18px">
    <div class="panel-head"><h2>2 · Review the concept</h2><span class="tiny-muted">NOT YET RENDERED</span></div>
    <div class="asmr-concept asmr-concept-${esc(ready.profile)}"><div class="asmr-shape"></div><small>Illustrative animation concept, not the finished video</small></div>
    <h3 style="margin-top:14px">${esc(ready.name)}</h3>
-   <p>${esc(ready.visual)}</p><p>${esc(ready.sound)}</p>
-   <p class="secondary-note"><strong>16 seconds</strong> · vertical 9:16 · no narration · no music · original synthetic sound · no captions. Video generation happens on GitHub, not your PC.</p>
-   <p class="secondary-note">This is a stylised satisfying animation. It does not depict photorealistic hands, real slime, real kinetic sand or recorded microphone sounds. That would require actual footage or a separately available AI-video provider.</p>
+   <p>${esc(ready.visual)}</p><p>${esc(ready.sound)}</p><p class="secondary-note"><strong>Automatically selected:</strong> ${esc(ready.colorway)} colourway · ${esc(ready.soundIntensity)} sound intensity. These are inferred from your title and optional description.</p>
+   <p class="secondary-note"><strong>16 seconds</strong> · vertical 9:16 · 24 fps · cinematic material texture · no narration or music · original stereo Foley · no captions. Video generation happens on GitHub, not your PC.</p>
+   <p class="secondary-note">This is a more detailed procedural macro-style animation with physically inspired lighting and synth Foley, not an AI-video model. It does not depict photorealistic hands, real slime, real kinetic sand or recorded microphone sounds. That would require actual footage or a separately available AI-video provider.</p>
    <button type="button" class="button button-primary" data-action="asmr-export">✓ Approve concept &amp; start online render</button>
    <p class="footnote">This downloads one small JSON file and opens your <strong>private</strong> GitHub upload page. Select the file there and commit to start the cloud render. No subscription image credits are used.</p>
  </section>`:''}
@@ -180,7 +180,7 @@ function asmrPlanAction(){
 function asmrExport(){
  try{
   if(!asmrPlan)throw Error('Enter a title and review the ASMR concept first.');
-  if(!confirm('Render a 16-second ORIGINAL animated ASMR video with synthetic sounds on your private GitHub Actions runner? GitHub free minutes are limited. Nothing will be automatically published.'))return;
+  if(!confirm('Render a 16-second cinematic-style ORIGINAL animated ASMR video with layered stereo synthetic sounds on your private GitHub Actions runner? GitHub free minutes are limited. Nothing will be automatically published.'))return;
   const name=window.DClipsASMR.filename();
   downloadJSON(name,asmrPlan);
   if(typeof window.open==='function')window.open('https://github.com/dclipsentertainment/shorts-studio-production/upload/main','_blank','noopener,noreferrer');
