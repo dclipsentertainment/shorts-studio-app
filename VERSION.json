@@ -1,6 +1,6 @@
 {
-  "version": "0.14.7",
+  "version": "0.14.8",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "A/B video quality comparison, editable speech-timed caption sidecars, synced cloud/local renderer, review-status Quality Gate and fresh-render approval fix"
+  "notes": "Story Series planner: multi-platform episode recommendations, editable Part 1/N drafts, one Facebook full-story version, illustrated biography scenes, original narration up to 10min and long-video QA"
 }
