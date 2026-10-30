@@ -19,19 +19,13 @@
   const paragraphs=String(script||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
   const out=[];
   for(const para of paragraphs){
-   // Keep sentences intact where feasible; split unusually long ones at
-   // clauses and finally words so target durations remain bounded.
-   const sentences=para.match(/[^.!?]+[.!?]+(?:["'”’])?|[^.!?]+$/g)||[para];
+   // Never split a sentence just to meet a duration. Very long sentences
+   // stay intact and produce an explicit editorial warning instead.
+   // A full stop inside a decimal is not a sentence boundary.
+   const sentences=para.match(/.+?(?:[.!?]+(?:["'”’])?(?=\s|$)|$)/g)||[para];
    for(const sentence of sentences){
-    const raw=sentence.trim();if(!raw)continue;
-    const clauses=wordCount(raw)>85?raw.split(/(?<=[,;:])\s+/):[raw];
-    for(const clause of clauses){
-     const words=clause.trim().split(/\s+/).filter(Boolean);
-     for(let i=0;i<words.length;i+=58){
-      const text=words.slice(i,i+58).join(' ');
-      if(text)out.push({text,words:wordCount(text)});
-     }
-    }
+    const text=sentence.trim();if(text)out.push({text,words:wordCount(text),
+     complete:/[.!?]+(?:["'”’])?$/.test(text)});
    }
   }
   return out;
@@ -85,8 +79,13 @@
     throw new Error(profile.name+' episode length must be 15–'+profile.max+' seconds.');
    const maximum=profile.max;
    // Even a "full" episode gets split for extremely long stories.
-   const requestedParts=mode==='full'?Math.max(1,Math.ceil(estimatedSeconds/maximum)):
-     Math.max(1,Math.ceil(estimatedSeconds/target));
+   // A manually selected part count takes priority over the automatic target.
+   // The same complete master story is redistributed at natural boundaries.
+   const forced=conf.parts==null||conf.parts===''?null:Number(conf.parts);
+   if(forced!==null&&(!Number.isInteger(forced)||forced<1||forced>60))
+    throw new Error(profile.name+' part count must be a whole number from 1 to 60.');
+   const requestedParts=forced??(mode==='full'?Math.max(1,Math.ceil(estimatedSeconds/maximum)):
+     Math.max(1,Math.ceil(estimatedSeconds/target)));
    if(requestedParts>60)throw new Error('This script would need over 60 parts on '+profile.name+'. Divide into smaller story chapters first.');
    const split=splitParts(pieces,requestedParts);
    const parts=split.map((item,i)=>{
@@ -97,7 +96,10 @@
      label:split.length===1?title:title+' — Part '+(i+1)+'/'+split.length};
    });
    const warnings=[];
-   if(parts.some(p=>p.seconds>maximum))warnings.push('Some sections exceed the platform/editor target. Rewrite or split long passages before exporting.');
+   if(requestedParts>split.length)warnings.push('Only '+split.length+' complete sentence groups are available. Add proper sentence breaks or rewrite the script to create '+requestedParts+' natural parts.');
+   if(pieces.some(p=>!p.complete))warnings.push('Some narration does not end with sentence punctuation. Complete these sentences before rendering; no automatic mid-sentence cuts are allowed.');
+   if(parts.some(p=>p.seconds>maximum))warnings.push('Some sentences/parts exceed the render limit. Rewrite those sentences or lower the speaking duration before exporting.');
+   if(parts.some(p=>p.seconds>target*1.3)&&split.length>1)warnings.push('Some parts exceed your target by over 30%. The story was kept intact at sentence boundaries.');
    if(parts.some(p=>p.seconds<20)&&parts.length>1)warnings.push('An episode is under 20 seconds; combine or rebalance after editorial review.');
    if(mode==='full'&&split.length>1)warnings.push('Complete story exceeds DClips’ current '+maximum+'-second original-video rendering limit; multiple chapters were suggested.');
    if(id==='TT')warnings.push('TikTok Creator Rewards is not available in all countries (including Ireland at present); duration alone does not qualify a video.');
