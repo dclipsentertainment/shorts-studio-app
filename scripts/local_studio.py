@@ -75,7 +75,7 @@ def validate_job(payload):
         raise ValueError('Too many captions.')
     if len(str(payload.get('title') or ''))>200:
         raise ValueError('Title is too long.')
-    if kind=='original' and (payload.get('visuals') or {}).get('mode')=='storyboard':
+    if kind=='original' and (payload.get('visuals') or {}).get('mode') in ('storyboard','illustrated'):
         if source.get('path') or source.get('url'):
             raise ValueError('Choose generated background before using storyboard mode.')
         from storyboard import build_scenes
