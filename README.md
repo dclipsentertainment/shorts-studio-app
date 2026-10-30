@@ -1,6 +1,6 @@
 # DClips Studio — multi-platform creator workspace
 
-**Current version: v0.14.5 | 30 October 2026**
+**Current version: v0.14.6 | 30 October 2026**
 
 DClips is a four-platform creator workspace for **YouTube Shorts, Instagram Reels, TikTok and Facebook Reels**. The same original 9:16 video can be prepared for each network, with separate account labels, manual performance metrics and earnings tracked by platform.
 
@@ -18,6 +18,12 @@ The source code is already prepared for Cloudflare Pages with a restricted publi
 - **Private production engine:** https://github.com/dclipsentertainment/shorts-studio-production
 
 The private repo includes cloud rendering, expressive AI voice synthesis, original storyboards, technical quality checks, and manually approved **private** YouTube uploads. TikTok, Instagram and Facebook publishing integrations are planned, not currently connected. Automatic publication is intentionally disabled.
+
+## Phase 1 production review
+
+- **Working now:** Local FFmpeg output and technical MP4 quality reports (codec, 9:16, duration, SHA-256), followed by four explicit human review checks. Editing the project invalidates previous approvals. See [Quality review](README-QUALITY-REVIEW.md).
+- **Tested:** GitHub Actions creates a rights-approved sample streamer clip with original audio and headline, then verifies the MP4 and review state.
+- **Limit:** Local AI voice synthesis requires optional speech packages and model files; previous cloud narrator previews remain available through the private production repository.
 
 ## Windows fallback
 
