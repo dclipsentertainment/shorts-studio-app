@@ -1,6 +1,6 @@
 {
-  "version": "0.14.11",
+  "version": "0.14.12",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "Title-first Quick Create: optional short description; ChatGPT story/scene prompt, review, image request and automatically prepared multi-platform drafts"
+  "notes": "Batch import ChatGPT images, preview and reorder scenes, create private render ZIP, render completely on GitHub Actions, and review MP4 in DClips"
 }
