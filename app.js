@@ -297,6 +297,7 @@ function previewPage(){
    <div class="form-field"><label for="preview-caption-text">Overwrite the current caption / headline</label><textarea class="field" id="preview-caption-text" rows="2" maxlength="160" placeholder="Select a cue or type your new hook"></textarea></div>
    <div class="preview-actions"><button class="button small button-ghost" data-action="preview-apply-text">✓ Apply caption text</button><button class="button small" data-action="preview-center-text">↔ Reset position</button></div>
    <div class="form-grid"><label class="form-field">Horizontal position (%)<input class="field" type="number" id="preview-caption-x" min="20" max="80" step="1" value="${Number.isFinite(Number(current?.captionX))?Math.min(80,Math.max(20,Number(current.captionX))):50}"></label><label class="form-field">Vertical position (%)<input class="field" type="number" id="preview-caption-y" min="12" max="85" step="1" value="${Number.isFinite(Number(current?.captionY))?Math.min(85,Math.max(12,Number(current.captionY))):75}"></label></div>
+   <button type="button" class="button button-ghost small" data-action="preview-remove-voice">✕ Remove voice-over now</button>
    <label class="checkbox-row"><input id="preview-remove-commentary" type="checkbox" ${(current?.voiceMode||'none')==='none'?'checked':''}><span><strong>Remove AI commentary</strong> — retain original stream audio when available</span></label>
    <p class="footnote">This removes added narration, not words or music already in the original recording. If there is no original audio, output may be silent.</p>
   </div>
@@ -1128,8 +1129,10 @@ function productionRemoveCommentary(){
  const dropdown=$('#production-voice');
  if(!dropdown){notice('Open a project in Production flow first.');return;}
  dropdown.value='none';
- productionSave();
- notice('Added voice-over removed. The original clip audio stays if available.');
+ try{
+  productionDraftSave();
+  notice('Added voice-over removed. Original stream audio stays if available.');
+ }catch(err){notice('Voice set to None but not saved: '+err.message);}
 }
 function productionApplyText(){
  const p=productionProject();if(!p)return;
