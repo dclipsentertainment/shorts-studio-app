@@ -1,6 +1,6 @@
 {
-  "version": "0.14.9",
+  "version": "0.14.10",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "Post-preview story revisions, typeable duration/part fields, complete sentence endings, narration quality guards, and preserved earlier renders"
+  "notes": "Chronological story scene plans, narrator-duration-aligned scene timing, optional explicitly approved paid image illustrations, local secret-only API key"
 }
