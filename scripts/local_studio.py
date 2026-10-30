@@ -117,7 +117,16 @@ def begin_task(job, kind):
                     except Exception as exc:
                         value['warning']='Speech alignment was unavailable: '+str(exc)[-170:]
 
-                # Validate the finished file itself, not merely the input job.
+                # Return word-timed caption edits from the real generated narration.
+                # The editor can correct them and re-render; they aren't preapproved.
+                timed_sidecar=result.with_suffix('.captions.json')
+                if timed_sidecar.is_file():
+                    parsed=json.loads(timed_sidecar.read_text(encoding='utf-8'))
+                    timed_cues=parsed.get('segments')
+                    if isinstance(timed_cues,list) and 1<=len(timed_cues)<=250:
+                        value['caption_segments']=timed_cues
+                        value['caption_alignment']='estimated_from_spoken_audio'
+                                # Validate the finished file itself, not merely the input job.
                 # These checks cover MP4 format/codec/resolution, not rights or originality.
                 from quality_check import check_video
                 quality = check_video(result)
