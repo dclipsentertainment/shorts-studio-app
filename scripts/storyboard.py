@@ -68,7 +68,11 @@ def build_scenes(job: dict) -> list[dict]:
             if not isinstance(image_path,str) or len(image_path)>250:
                 raise ValueError('Invalid image path.')
             scene_media_path(image_path)
-        output.append({'headline':headline, 'image_path':image_path})
+        start=row.get('start_seconds')
+        if start is not None:
+            if isinstance(start,bool) or not isinstance(start,(int,float)) or not math.isfinite(start) or start<0:
+                raise ValueError('Scene start_seconds must be a nonnegative number.')
+        output.append({'headline':headline, 'image_path':image_path, 'start_seconds':start})
     return output
 
 
@@ -101,7 +105,7 @@ def wrap_lines(draw, text, fnt, max_width=595, max_lines=4):
     return lines
 
 
-def draw_scene(scene: dict, i: int, count: int, theme: str, dest: Path):
+def draw_scene(scene: dict, i: int, count: int, theme: str, dest: Path, *, illustrated=False, cover=False, title=''):
     from PIL import Image,ImageDraw,ImageFilter
     dark,mid,accent=PALETTES[theme]
     w,h=720,1280
@@ -120,8 +124,39 @@ def draw_scene(scene: dict, i: int, count: int, theme: str, dest: Path):
         pic=pic.resize((math.ceil(pic.width*scale),math.ceil(pic.height*scale)),Image.Resampling.LANCZOS)
         x=(pic.width-w)//2;y=(pic.height-h)//2
         base=pic.crop((x,y,x+w,y+h)).convert('RGBA')
-        dim=Image.new('RGBA',(w,h),(4,10,26,180))
+        dim=Image.new('RGBA',(w,h),(4,10,26,0 if illustrated else 180))
         base=Image.alpha_composite(base,dim)
+    if illustrated:
+        # Image-first story: full-bleed illustration and no repeated scene
+        # headlines, labels or branding over spoken-word captions.
+        # Only the COVER carries the story title. All subsequent scenes
+        # contain illustrations only; captions are added by render.py.
+        from PIL import ImageDraw
+        if cover:
+            band=Image.new('RGBA',(w,h),(0,0,0,0))
+            draw=ImageDraw.Draw(band)
+            draw.rounded_rectangle((38,150,682,520),radius=26,fill=(3,8,24,172))
+            base=Image.alpha_composite(base,band)
+            d=ImageDraw.Draw(base)
+            heading=title[:110] or scene['headline']
+            fnt=font(60 if len(heading)<65 else 46,bold=True)
+            lines=wrap_lines(d,heading,fnt,max_width=570,max_lines=4)
+            y=200
+            for line in lines:
+                d.text((72,y),line,font=fnt,fill=(255,255,255,255))
+                y+=77 if len(heading)<65 else 65
+        # Minimal transparent gradient at bottom is acceptable for legible
+        # subtitle contrast; never write duplicate text onto images.
+        else:
+            shade=Image.new('RGBA',(w,h),(0,0,0,0))
+            sd=ImageDraw.Draw(shade)
+            for y in range(920,h):
+                alpha=round(115*(y-920)/(h-920))
+                sd.line((0,y,w,y),fill=(0,0,0,alpha))
+            base=Image.alpha_composite(base,shade)
+        dest.parent.mkdir(parents=True,exist_ok=True)
+        base.convert('RGB').save(dest,optimize=True)
+        return
     # Geometric subject motifs make scenes visibly different even without photos.
     accents=Image.new('RGBA',(w,h),(0,0,0,0));d=ImageDraw.Draw(accents)
     cx=430+(seed%145)-72;cy=660+((seed>>7)%170)-85
@@ -172,7 +207,14 @@ def create_story_video(job: dict, runtime: float, folder: Path) -> Path:
     if transition not in ('fade','cut'):
         raise ValueError('Visual transition must be fade or cut.')
     scenes=build_scenes(job)
+    illustrated=visuals.get('mode')=='illustrated'
     count=len(scenes)
+    if illustrated:
+        if count<2:
+            raise ValueError('Illustrated stories need a cover image and at least one story scene image.')
+        if any(not row['image_path'] for row in scenes):
+            raise ValueError('Illustrated scenes require real, owned/licensed scene images. Text cards are not substituted.')
+
     if count<1 or count>8:
         raise ValueError('Storyboard requires 1–8 scenes.')
     if runtime/count<1.2:
@@ -180,11 +222,29 @@ def create_story_video(job: dict, runtime: float, folder: Path) -> Path:
     if not shutil.which('ffmpeg'):
         raise ValueError('FFmpeg is required for the scene renderer.')
     t=0.33 if transition=='fade' and count>1 else 0
-    for i,scene in enumerate(scenes):draw_scene(scene,i,count,theme,folder/f'scene-{i:02}.png')
-    length=runtime/count
+    if illustrated:
+        intro=float(visuals.get('intro_seconds',2.0))
+        if not 1.2<=intro<=4.0 or runtime-intro<1.2*(count-1):
+            raise ValueError('Need 1.2–4 second cover and at least 1.2 seconds per illustrated scene.')
+        starts=[row['start_seconds'] for row in scenes[1:]]
+        if any(x is not None for x in starts):
+            if any(x is None for x in starts) or abs(starts[0])>0.01:
+                raise ValueError('Timed illustrated story scenes need a start time for each beat; first beat starts at 0.')
+            if any(b-a<1.2 for a,b in zip(starts,starts[1:])):
+                raise ValueError('Leave at least 1.2 seconds between story scene start times.')
+            if runtime-intro-starts[-1]<1.2:
+                raise ValueError('Final story scene starts too late for the narration length.')
+            scene_lengths=[intro]+[b-a for a,b in zip(starts,starts[1:]+[runtime-intro])]
+        else:
+            scene_lengths=[intro]+[(runtime-intro)/(count-1)]*(count-1)
+    else:
+        scene_lengths=[runtime/count]*count
+    for i,scene in enumerate(scenes):
+        draw_scene(scene,i,count,theme,folder/f'scene-{i:02}.png',
+                   illustrated=illustrated,cover=illustrated and i==0,title=str(job.get('title') or 'Our story'))
     files=[]
     for i in range(count):
-        scene_runtime=length+(t if i<count-1 else 0)
+        scene_runtime=scene_lengths[i]+(t if i<count-1 else 0)
         still=folder/f'scene-{i:02}.png'
         clip=folder/f'part-{i:02}.mp4'
         # Encode each motion scene with a true CFR before applying crossfades.
@@ -210,7 +270,7 @@ def create_story_video(job: dict, runtime: float, folder: Path) -> Path:
         acc='0:v'
         for i in range(1,count):
             target=f'joined{i}'
-            graph.append(f'[{acc}][{i}:v]xfade=transition=fade:duration={t}:offset={i*length:.5f}[{target}]')
+            graph.append(f'[{acc}][{i}:v]xfade=transition=fade:duration={t}:offset={sum(scene_lengths[:i]):.5f}[{target}]')
             acc=target
     else:
         acc='joined';graph.append(''.join(f'[{i}:v]' for i in range(count))+f'concat=n={count}:v=1:a=0[{acc}]')
