@@ -29,7 +29,7 @@ TASKS = {}
 LOCK = threading.Lock()
 
 CONTENT_TYPES = {'.html':'text/html; charset=utf-8','.js':'application/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.mp4':'video/mp4','.webm':'video/webm','.jpg':'image/jpeg','.jpeg':'image/jpeg','.webp':'image/webp','.png':'image/png','.json':'application/json; charset=utf-8','.srt':'text/plain; charset=utf-8'}
-ALLOWED_STATIC = {'/','/index.html','/app.js','/story-series.js','/quick-create.js','/github-usage.js','/styles.css','/assets/example-background.mp4'}
+ALLOWED_STATIC = {'/','/index.html','/app.js','/story-series.js','/quick-create.js','/cloud-pack.js','/github-usage.js','/styles.css','/assets/example-background.mp4'}
 MEDIA_EXTS = {'.mp4','.mov','.m4v','.webm','.mp3','.wav','.m4a','.png','.jpg','.jpeg','.webp'}
 
 

@@ -157,3 +157,11 @@
 .series-part small{color:var(--muted)}
 .series-part p{font-size:12px;line-height:1.55;color:var(--muted);margin:10px 0 0;overflow-wrap:anywhere}
 @media(max-width:850px){.series-platform-grid,.series-parts{grid-template-columns:1fr}}
+
+/* Image-first bulk upload review: compact thumbnails without oversized panels. */
+.cloud-image-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(155px,1fr));gap:12px;margin:12px 0}
+.cloud-image-item{min-width:0;overflow:hidden}
+.cloud-image-item p{overflow-wrap:anywhere}
+.cloud-image-item img{display:block;aspect-ratio:9/16;max-height:190px;object-fit:cover}
+.cloud-image-item select{width:100%;max-width:100%;font-size:12px}
+@media(max-width:480px){.cloud-image-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
