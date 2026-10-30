@@ -1306,6 +1306,7 @@ function productionDraftSave(){
  const p=productionProject();if(!p)throw Error('Choose a project first.');
  const title=str($('#production-title')?.value).slice(0,150);
  const script=$('#production-script')?.value||'';
+ if(p.script!==script)p.scenePlanText=[];
  const duration=Number($('#production-length')?.value);
  const start=Number($('#production-start')?.value);
  if(!title)throw Error('Enter a video title.');
@@ -1387,24 +1388,29 @@ async function productionAutoScenes(){
  const p=productionProject();if(!p||p.kind!=='original')return;
  const script=$('#production-script')?.value||'',title=$('#production-title')?.value||p.title;
  if(!script.trim()){notice('Write the complete narration first.');return}
+ try{productionDraftSave()}catch(e){notice(e.message);return}
  const duration=Number($('#production-length')?.value)||30;
  try{
   let plan;
   if(productionBackend.local){
-   plan=await productionAPI('/api/scene-plan',{title,script,spoken_seconds:Math.max(5,duration-2),max_scenes:6});
+   plan=await productionAPI('/api/scene-plan',{title,script,spoken_seconds:Math.max(5,duration-2),max_scenes:8});
   }else{
    const sentences=script.split(/(?<=[.!?])\s+|\n+/).map(x=>x.trim()).filter(Boolean);
-   const n=Math.min(5,sentences.length),starts=[];
-   const weights=sentences.map(x=>(x.match(/[\p{L}\p{N}]+/gu)||[]).length||1),total=weights.reduce((x,y)=>x+y,0);
-   for(let i=0;i<n;i++)starts.push(Math.round((duration-2)*weights.slice(0,i).reduce((x,y)=>x+y,0)/total*100)/100);
-   plan={spoken_seconds:Math.max(5,duration-2),scenes:[{headline:title,start_seconds:null},
-    ...Array.from({length:n},(_,i)=>({headline:sentences[i].slice(0,95),start_seconds:starts[i]}))]};
+   const n=Math.min(7,sentences.length),weights=sentences.map(x=>(x.match(/[\p{L}\p{N}]+/gu)||[]).length||1),total=weights.reduce((x,y)=>x+y,0);
+   const beats=Array.from({length:n},(_,i)=>{
+    const first=Math.floor(i*sentences.length/n),end=Math.floor((i+1)*sentences.length/n);
+    const beat=sentences.slice(first,end).join(' ');
+    const start=Math.round((duration-2)*weights.slice(0,first).reduce((x,y)=>x+y,0)/total*100)/100;
+    return {headline:sentences[first].slice(0,95),start_seconds:start,beat_text:beat};
+   });
+   plan={spoken_seconds:Math.max(5,duration-2),scenes:[{headline:title,start_seconds:null,beat_text:'Cover artwork for '+title},...beats]};
   }
   const rows=plan.scenes.map((beat,i)=>i===0?beat.headline:
     `${beat.start_seconds}@${beat.headline}`);
   $('#production-scenes').value=rows.join('\n');
   $('#production-visual-mode').value='illustrated';
   p.sceneTimingReference=plan.spoken_seconds;
+  p.scenePlanText=plan.scenes.map(beat=>beat.beat_text||beat.headline);
   const summary=$('#visual-scene-summary');
   if(summary)summary.textContent='Prepared '+rows.length+' chronological scenes, using estimated start times relative to the first spoken word. Actual narration duration will adjust the timings at render. Check each scene, then attach or generate its picture.';
   notice('Story scenes and timing planned. Review descriptions, then create the illustrations.');
@@ -1426,7 +1432,7 @@ async function productionGenerateSceneImages(){
   const progress=$('#production-progress');if(progress)progress.textContent='Requesting AI scene images using configured provider…';
   const response=await productionAPI('/api/scene-images',{
    title:prepared.title,script:prepared.script,style:'cinematic',
-   scenes:prepared.visualScenes.map(s=>({headline:s.headline,image_path:s.image_path||''}))
+   scenes:prepared.visualScenes.map((s,i)=>({headline:s.headline,image_path:s.image_path||'',beat_text:prepared.scenePlanText?.[i]||s.headline}))
   });
   const completed=await productionPoll(response.task_id);
   if(productionProjectId!==prepared.id)throw Error('Project changed during generation; generated pictures remain in local media for reuse.');
