@@ -9,8 +9,8 @@ function SafePath([string]$name) {
     if ($name -in @('index.html','VERSION.json','styles.css','app.js','github-usage.js',
         'OPEN-DASHBOARD.cmd','OPEN-PRODUCTION-STUDIO.cmd','CHECK-FOR-UPDATES.cmd',
         'SETUP-UPDATES.cmd','.gitignore','requirements-visuals.txt')) { return $true }
-    if ($name -match '^README(?:-[a-zA-Z0-9_-]+)?\\.md$') { return $true }
-    return ($name -match '^scripts/[a-zA-Z0-9_-]+\\.(py|ps1|js)$' -or
+    if ($name -match '^README(?:-[a-zA-Z0-9_-]+)?\.md$') { return $true }
+    return ($name -match '^scripts/[a-zA-Z0-9_-]+\.(py|ps1|js)$' -or
         $name -eq '.github/workflows/release-app.yml')
 }
 try {
@@ -25,7 +25,7 @@ try {
     # This is a read-only check against one pinned, public release source. No user inputs needed.
     $release = Invoke-RestMethod -Uri "https://api.github.com/repos/$repo/releases/latest" -Headers $headers -TimeoutSec 12
     if ($release.draft -or $release.prerelease) { throw 'Latest release is not stable.' }
-    $tagMatch = [regex]::Match([string]$release.tag_name, '^v(\\d+\\.\\d+\\.\\d+)$')
+    $tagMatch = [regex]::Match([string]$release.tag_name, '^v(\d+\.\d+\.\d+)$')
     if (-not $tagMatch.Success) { throw 'Unexpected latest release tag.' }
     [version]$latest = [version]$tagMatch.Groups[1].Value
     if ($latest -le $currentVersion) { Log "DClips is up to date (v$current)."; exit 0 }
@@ -56,7 +56,7 @@ try {
         try {
             foreach ($entry in $archive.Entries) {
                 if ($entry.FullName.EndsWith('/')) { continue }
-                $name = $entry.FullName.Replace('\\','/')
+                $name = $entry.FullName.Replace('\','/')
                 if (-not (SafePath $name) -or $seen.ContainsKey($name)) {
                     throw "Refusing unsafe or duplicate update path: $name"
                 }
