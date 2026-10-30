@@ -1,6 +1,6 @@
 {
-  "version": "0.14.5",
+  "version": "0.14.6",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "One-click AI voiceover removal, editable caption or headline text, draggable on-video captions, exact X/Y position in exported MP4; legal reuse guidance"
+  "notes": "Phase 1 video quality: consistent renderer, local MP4 technical QA, final playback and rights approval, review invalidation after edits, owned-clip end-to-end smoke tests"
 }
