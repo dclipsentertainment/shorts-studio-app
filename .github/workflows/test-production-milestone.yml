@@ -7,6 +7,8 @@ on:
       - scripts/local_studio.py
       - scripts/quality_check.py
       - scripts/test_local_production.py
+      - scripts/test_review_gate.js
+      - app.js
       - .github/workflows/test-production-milestone.yml
 permissions:
   contents: read
@@ -33,3 +35,4 @@ jobs:
           node --check github-usage.js
           node scripts/test_github_usage.js
           node scripts/test_caption_ui.js
+          node scripts/test_review_gate.js
