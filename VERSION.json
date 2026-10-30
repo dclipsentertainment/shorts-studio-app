@@ -1,6 +1,6 @@
 {
-  "version": "0.14.16",
+  "version": "0.14.17",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "ASMR Pro four-shot 16s storytelling-style satisfying visuals with reveal, first action, texture close-up, payoff and reset; synchronized layered stereo sound; online GitHub render and shot-plan playback"
+  "notes": "Audit fixes, seamless ASMR loop transitions, editable duration and variation, verified voice downloads and release regression checks"
 }

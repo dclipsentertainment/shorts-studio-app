@@ -68,7 +68,9 @@ async function run(){
  const proArtifact=pack.zip([
   {name:'output/asmr-slime-pro.mp4',data:mp4},
   {name:'output/quality-report.json',data:new TextEncoder().encode('{"status":"pass"}')},
-  {name:'output/asmr-shot-plan.json',data:new TextEncoder().encode('{"engine":"asmr-pro-v3"}')}
+  {name:'output/asmr-shot-plan.json',data:new TextEncoder().encode('{"engine":"asmr-pro-v3"}')},
+  {name:'output/asmr-slime-pro.provenance.json',data:new TextEncoder().encode('{}')},
+  {name:'output/asmr-slime-pro.captions.json',data:new TextEncoder().encode('{}')}
  ]);
  const proMP4=await pack.videoFromArtifactZip(new File([proArtifact],'finished-asmr-video.zip',{type:'application/zip'}));
  assert.equal(proMP4.name,'asmr-slime-pro.mp4');
@@ -94,3 +96,4 @@ async function run(){
  console.log('PASS: bulk scene matching, manual swaps, image-type validation, sealed private render ZIP, GitHub artifact ZIP playback, no network or API costs.');
 }
 run().catch(e=>{console.error(e);process.exitCode=1});
+

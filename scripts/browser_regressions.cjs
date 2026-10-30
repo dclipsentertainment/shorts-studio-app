@@ -33,6 +33,12 @@ const project={id:'p',title:'Original',kind:'original',status:'draft',channelId:
   await f.page.waitForFunction(()=>document.querySelector('#cloud-scene-list').textContent.includes('2/2 images'));
   await f.page.reload();await f.page.waitForFunction(()=>document.querySelector('#cloud-scene-list')?.textContent.includes('2/2 images'));
   assert.deepEqual(f.errors,[]);await f.context.close();
+  f=await setup();await f.page.goto(base+'/#asmr');
+  await f.page.fill('#asmr-title','Soap carving');await f.page.fill('#asmr-duration','24');await f.page.fill('#asmr-variation','6');
+  await f.page.click('[data-action="asmr-plan"]');
+  assert.equal(await f.page.inputValue('#asmr-duration'),'24');
+  await f.page.reload();assert.equal(await f.page.inputValue('#asmr-duration'),'24');assert.equal(await f.page.inputValue('#asmr-variation'),'6');
+  assert.deepEqual(f.errors,[]);await f.context.close();
   console.log('PASS: real-browser render race, duration reconciliation, reload and persistent image assignment');
  }finally{if(browser)await browser.close();server.kill();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

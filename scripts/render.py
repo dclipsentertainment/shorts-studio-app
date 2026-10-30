@@ -744,6 +744,8 @@ def render(job_path: Path, out_dir: Path) -> Path:
                 entries.append(f'{i}\n{srt_time(part["start_seconds"])} --> {srt_time(part["end_seconds"])}\n{part["text"]}\n')
             (out_dir/f'{safe}.captions.srt').write_text('\n'.join(entries),encoding='utf-8')
             print(f'Caption review sidecars: {len(timed)} editable cues (human review required).')
+    from artifact_identity import write_provenance
+    write_provenance(output,data,duration_of(output))
     print(f'✅ Finished: {output} ({output.stat().st_size/1024/1024:.2f} MiB)')
     return output
 

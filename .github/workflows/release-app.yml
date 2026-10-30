@@ -20,7 +20,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Validate release tag
         env:
           RELEASE_TAG: ${{ inputs.tag }}
@@ -52,11 +52,21 @@ jobs:
           python -m compileall -q scripts
       - name: Package public code only
         run: python scripts/make_app_release.py --out dist/shorts-studio-app.zip
+      - name: Check packaged application and checksum
+        run: |
+          python - <<'PYCODE'
+          import pathlib,zipfile,json
+          with zipfile.ZipFile('dist/shorts-studio-app.zip') as z:
+              assert z.testzip() is None
+              assert any(n.endswith('scripts/artifact_identity.py') for n in z.namelist())
+              z.extractall('/tmp/dclips-release-check')
+          PYCODE
+          sha256sum dist/shorts-studio-app.zip > dist/shorts-studio-app.zip.sha256
       - name: Publish release asset
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" dist/shorts-studio-app.zip \
+          gh release create "$RELEASE_TAG" dist/shorts-studio-app.zip dist/shorts-studio-app.zip.sha256 \
             --target "$GITHUB_SHA" \
             --title "Shorts Studio $RELEASE_TAG" \
             --notes "Code-only app update. Does not contain footage, user data or credentials."
