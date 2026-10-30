@@ -1289,7 +1289,7 @@ function cloudEpisodeImagePrompt(project){
   'Use consistent character appearance, period details and artwork style; no text, captions, logos or watermarks. Vertical 9:16 layout with the lower third clear for subtitles.',
   ...project.visualScenes.map((scene,i)=>String(i+1).padStart(2,'0')+(i===0?'-cover':'-scene')+
      ': '+scene.headline+'. '+(i===0?'Opening establishing image; do not draw title text.':'Illustration of this specific moment in the narration.')),
-  'I will save each image with the numbered filename above to match DClips automatically. Produce original art only; do not claim historical reconstructions are real photos.'
+  'Generate the numbered pictures separately. If you can, package them into a single dclips-images.zip with only these image files; otherwise give me the separate pictures. Use those exact filenames. Produce original art only; do not claim historical reconstructions are real photos.'
  ].join('\n');
 }
 function cloudCopyEpisode(){
