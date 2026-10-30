@@ -29,7 +29,7 @@ jobs:
         run: bash scripts/build_cloudflare_pages.sh
       - name: Verify only intended public assets are shipped
         run: |
-          test "$(find dist-cloudflare -maxdepth 1 -type f | wc -l)" -eq 6
+          test "$(find dist-cloudflare -maxdepth 1 -type f | wc -l)" -eq 7
           test ! -e dist-cloudflare/scripts
           test ! -e dist-cloudflare/user-data
           test ! -e dist-cloudflare/reports
