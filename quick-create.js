@@ -76,5 +76,18 @@
   for(let i=1;i<beats.length;i++)if(beats[i].start_seconds-beats[i-1].start_seconds<1.2)beats[i].start_seconds=beats[i-1].start_seconds+1.2;
   return [{headline:plain(title,95)||'Story cover',image_path:'',start_seconds:null},...beats.filter(x=>x.start_seconds<=spoken-1.2)];
  }
- return {prompt,parse,scenesForPart,wordCount:wc};
+ function imagePrompt(pack){
+  if(!pack||!Array.isArray(pack.scenes)||!pack.scenes.length)throw Error('Review a generated story first.');
+  return [
+   'Create '+(pack.scenes.length+1)+' SEPARATE ORIGINAL vertical 9:16 story illustrations. Do not make a collage or contact sheet.',
+   'STORY: '+pack.title,
+   'CONSISTENT STYLE: '+pack.illustrationStyle,
+   'Maintain the same characters, distinctive facial features, clothing and period throughout age progression.',
+   'For every image: no printed words, logos, text, captions or watermarks. Leave lower third clear for subtitle overlays.',
+   '01-cover: A cinematic title cover illustration of the story setting, WITHOUT text (DClips overlays the title).',
+   ...pack.scenes.map((s,i)=>String(i+2).padStart(2,'0')+'-scene: '+s.visual+' (narrated at: '+s.quote+')'),
+   'Please produce each numbered image separately, ideally with a downloadable file. Keep the order and style. Ask me to continue if your image generation limits prevent producing the full set.'
+  ].join('\n');
+ }
+ return {prompt,parse,scenesForPart,imagePrompt,wordCount:wc};
 });
