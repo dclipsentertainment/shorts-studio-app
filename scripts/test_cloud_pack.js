@@ -28,7 +28,7 @@ async function run(){
  assert(!JSON.stringify(job).includes('scene-01.png'),'Must not mutate original draft');
  assert.throws(()=>pack.detect(Uint8Array.from([1,2,3])),/not a genuine/);
  await assert.rejects(()=>pack.packageJob({...job,rights_confirmed:false},mapped.slots),/rights-confirmed/);
- await assert.rejects(()=>pack.packageJob(job,[files[0],files[0]]),/extension does not match/);
+ await assert.rejects(()=>pack.packageJob(job,[file('02-wrong.png',jpg),files[0]]),/extension does not match/);
  const app=fs.readFileSync('app.js','utf8'),html=fs.readFileSync('index.html','utf8');
  assert(app.includes('data-action="cloud-export"')&&app.includes('data-action="cloud-clear"'));
  assert(html.includes('cloud-pack.js'));
