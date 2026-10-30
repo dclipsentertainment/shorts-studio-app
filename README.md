@@ -1,6 +1,6 @@
 # DClips Studio — multi-platform creator workspace
 
-**Current version: v0.14.3 | 30 October 2026**
+**Current version: v0.14.4 | 30 October 2026**
 
 DClips is a four-platform creator workspace for **YouTube Shorts, Instagram Reels, TikTok and Facebook Reels**. The same original 9:16 video can be prepared for each network, with separate account labels, manual performance metrics and earnings tracked by platform.
 
@@ -22,6 +22,12 @@ The private repo includes cloud rendering, expressive AI voice synthesis, origin
 ## Windows fallback
 
 If you prefer the local version, download the release ZIP from https://github.com/dclipsentertainment/shorts-studio-app/releases/latest, extract once, and open `OPEN-DASHBOARD.cmd`. The launcher checks for new releases and updates itself without Git or administrator access.
+
+## Two creative modes
+
+- **Stream Monitor:** Track Twitch, Kick and YouTube streamers in a saved watchlist, record reuse permissions, and create review-only clip projects. Automatic go-live detection, stream recording and candidate scoring are NOT connected yet. See [Stream and AI Story guide](README-STREAMS.md).
+- **AI Stories:** Four narrator options (two female, two male) in Content Studio and Production Flow. The private GitHub engine can generate narrated previews with captions timed using the generated audio. Always review sync and transcription accuracy.
+- **Creator clips:** Keep original audio by default; choose top headline only, accurate captions, or no overlays. Text/music does NOT avoid copyright.
 
 ## Security and monetisation
 
