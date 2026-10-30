@@ -1,6 +1,6 @@
 {
-  "version": "0.14.8",
+  "version": "0.14.9",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "Story Series planner: multi-platform episode recommendations, editable Part 1/N drafts, one Facebook full-story version, illustrated biography scenes, original narration up to 10min and long-video QA"
+  "notes": "Post-preview story revisions, typeable duration/part fields, complete sentence endings, narration quality guards, and preserved earlier renders"
 }
