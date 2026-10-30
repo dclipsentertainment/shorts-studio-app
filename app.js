@@ -13,7 +13,9 @@ const $ = s => document.querySelector(s);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const str = v => String(v ?? '').trim();
 const uid = () => (typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `ss-${Date.now()}-${Math.random().toString(36).slice(2,10)}`);
+let workspaceLoadError='';
 let state = load();
+let lastSavedWorkspace=(()=>{try{return localStorage.getItem(STORE_KEY)}catch(_){return null}})();
 if(!Array.isArray(state.scoutReports)) state.scoutReports=[];
 if(!Array.isArray(state.trends)) state.trends=[];
 if(!Array.isArray(state.streamers)) state.streamers=[];
@@ -61,11 +63,63 @@ let previewFileDuration = 0;
 let previewEditingCueIndex = -1;
 let captionDragging = null;
 let toastTimer;
-function load(){try{let item=JSON.parse(localStorage.getItem(STORE_KEY)); if(item && item.version === 1 && Array.isArray(item.channels) && Array.isArray(item.projects)) return item;}catch(err){console.warn('Could not load local data:',err)}return initial()}
+function validateWorkspace(input){
+ const fail=()=>{throw Error('Invalid workspace backup. No existing data was replaced.');};
+ const record=x=>x&&typeof x==='object'&&!Array.isArray(x);
+ const identifier=x=>typeof x==='string'&&/^[A-Za-z0-9][A-Za-z0-9_.:-]{0,149}$/.test(x);
+ function walk(value,depth=0){
+  if(depth>18)fail();
+  if(value===null||typeof value==='boolean')return;
+  if(typeof value==='number'){if(!Number.isFinite(value))fail();return;}
+  if(typeof value==='string'){if(value.length>200000)fail();return;}
+  if(Array.isArray(value)){if(value.length>10000)fail();value.forEach(v=>walk(v,depth+1));return;}
+  if(!record(value))fail();
+  for(const [key,v] of Object.entries(value)){
+   if(['__proto__','prototype','constructor'].includes(key))fail();
+   if(key==='id'||key==='channelId'||key==='projectId'){if(v!==null&&v!==''&&!identifier(v))fail();}
+   if(/url$/i.test(key)&&typeof v==='string'&&v&&!/^https?:\/\//i.test(v)&&!/^\/output\/[0-9a-f]{32}\/[a-z0-9-]{1,50}\.mp4$/.test(v))fail();
+   walk(v,depth+1);
+  }
+ }
+ if(!record(input)||input.version!==1||!Array.isArray(input.channels)||!Array.isArray(input.projects)||input.channels.length>1000||input.projects.length>10000)fail();
+ walk(input);
+ for(const rows of [input.channels,input.projects]){
+  const seen=new Set();for(const row of rows){if(!record(row)||!identifier(row.id)||seen.has(row.id))fail();seen.add(row.id);}
+ }
+ for(const c of input.channels){if(typeof c.name!=='string'||c.name.length>150)fail();if(c.color&&!/^#[0-9a-f]{3,8}$/i.test(c.color))fail();}
+ for(const p of input.projects){
+  if(typeof p.title!=='string'||p.title.length>150||!['clip','original'].includes(p.kind)||!['idea','draft','ready','scheduled','published'].includes(p.status))fail();
+  for(const key of ['script','timedCaptions','voiceMode','sourcePath','sourceUrl','audioPath'])if(p[key]!=null&&typeof p[key]!=='string')fail();
+  if(p.duration!=null&&(!Number.isFinite(Number(p.duration))||Number(p.duration)<3||Number(p.duration)>600))fail();
+  if(p.visualScenes!=null&&(!Array.isArray(p.visualScenes)||p.visualScenes.length>8))fail();
+ }
+ const result=JSON.parse(JSON.stringify(input));
+ for(const [name,limit] of [['scoutReports',20],['trends',1000],['streamers',1000],['seriesPlans',500],['renderHistory',30]]){
+  if(result[name]!=null&&(!Array.isArray(result[name])||result[name].length>limit))fail();
+  result[name]??=[];
+ }
+ if(result.discovery&&(!Array.isArray(result.discovery.items)||result.discovery.items.length>500))fail();
+ if(!Number.isSafeInteger(result.viralThreshold)||result.viralThreshold<1)result.viralThreshold=100000;
+ return result;
+}
+function load(){try{const raw=localStorage.getItem(STORE_KEY);if(raw)return validateWorkspace(JSON.parse(raw));}catch(err){workspaceLoadError='Saved workspace needs recovery. Export its data before replacing it.';console.warn('Workspace requires recovery:',err)}return initial()}
 function recoveryEntries(){
  try{const entries=JSON.parse(localStorage.getItem(RECOVERY_KEY)||'[]');return Array.isArray(entries)?entries.filter(x=>x&&typeof x.data==='string'&&typeof x.savedAt==='string').slice(-5):[]}catch(_){return []}
 }
+function captionNarrationKey(p){return JSON.stringify([p.kind||'',p.script||'',p.voiceMode||'none',p.voiceName||'',p.audioPath||'',p.sourcePath||'',p.sourceUrl||'',Number(p.start||0),Number(p.duration||0)]);}
+function captionsAreStale(p){return Boolean(p.timedCaptions&&p.captionNarrationKey&&p.captionNarrationKey!==captionNarrationKey(p));}
+function refreshCaptionAlignment(){
+ const p=productionProject();if(!p)return;
+ try{productionDraftSave();}catch(e){notice(e.message);return;}
+ if(p.timedCaptions)p.captionHistory=[...(p.captionHistory||[]),{segments:p.timedCaptions,narrationKey:p.captionNarrationKey,savedAt:new Date().toISOString()}].slice(-5);
+ productionCues=[];p.timedCaptions='';p.captionNarrationKey=captionNarrationKey(p);
+ save();render();notice('Previous captions saved in project history. Render the AI voice again to align captions, or transcribe/import current audio.');
+}
 function save(){
+ if(workspaceLoadError){notice(workspaceLoadError);return false;}
+ try{if(localStorage.getItem(STORE_KEY)!==lastSavedWorkspace){notice('Another tab changed this workspace. Export your edits, then reload before saving.');return false;}}catch(_){}
+ const previousState=(()=>{try{return JSON.parse(localStorage.getItem(STORE_KEY)||'null')}catch(_){return null}})();
+ for(const p of state.projects){if(p.timedCaptions&&!p.captionNarrationKey){const old=previousState?.projects?.find(x=>x.id===p.id);p.captionNarrationKey=captionNarrationKey(old||p);}}
  const next=JSON.stringify(state);
  try{
   const previous=localStorage.getItem(STORE_KEY);
@@ -74,6 +128,7 @@ function save(){
    localStorage.removeItem(RECOVERY_KEY);
    localStorage.setItem(STORE_KEY,next);
   }
+  lastSavedWorkspace=next;
   if(previous && previous!==next && previous.length<300000){
    try{
     let list=recoveryEntries();list.push({savedAt:new Date().toISOString(),data:previous});
@@ -86,11 +141,10 @@ function save(){
 }
 function restoreRecovery(index){
  const points=recoveryEntries(),entry=points[index];if(!entry){notice('Recovery point no longer exists.');return}
- let recovered;try{recovered=JSON.parse(entry.data)}catch(_){notice('Recovery point is damaged.');return}
- if(!recovered||recovered.version!==1||!Array.isArray(recovered.channels)||!Array.isArray(recovered.projects)){notice('Invalid recovery point.');return}
+ let recovered;try{recovered=validateWorkspace(JSON.parse(entry.data))}catch(_){notice('Recovery point is damaged.');return}
  if(!confirm(`Restore workspace from ${dateStr(entry.savedAt)}? Current data is saved as a recovery point first.`))return;
- state=recovered;if(!Array.isArray(state.scoutReports))state.scoutReports=[];if(!Array.isArray(state.trends))state.trends=[];
- if(!save()){notice('Recovery could not be saved.');return}
+ const previous=state;state=recovered;workspaceLoadError='';lastSavedWorkspace=localStorage.getItem(STORE_KEY);
+ if(!save()){state=previous;notice('Recovery could not be saved.');return}
  render();notice('Recovery point restored. Export a backup for longer-term protection.');
 }
 function notice(text){const e=$('#toast');e.textContent=text;e.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>e.classList.remove('show'),3900)}
@@ -108,6 +162,7 @@ function render(){
  document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===page));
  const main=$('#main');main.innerHTML=({asmr:asmrPage,quick:quickPage,overview:overview,channels:channelsPage,production:productionPage,series:seriesPage,studio:studioPage,queue:queuePage,scout:scoutPage,live:liveMonitorPage,radar:radarPage,discover:discoverPage,analytics:analyticsPage,usage:window.DClipsUsageMonitor.render,growth:growthPage,creative:creativePage,ai:aiDeskPage,preview:previewPage,quality:qualityPage,competitors:competitorsPage,setup:setupPage}[page])();
  if(page==='usage')window.DClipsUsageMonitor.afterRender();
+ if(page==='production')restoreProjectMedia(productionProjectId);
  if(page==='preview')previewRestoreDisplay();
  if(page==='production'){productionRestoreDisplay();productionCheckBackend();}
 }
@@ -121,7 +176,7 @@ function overview(){
  <div class="kpis">
  ${[{a:'Channels',v:state.channels.length,ic:'◫',f:'Independent content niches'},{a:'Content projects',v:state.projects.length,ic:'✧',f:'Clips and original videos'},{a:'Ready / scheduled',v:ready,ic:'◷',f:'Prepared for publishing'},{a:'Recorded views',v:compact(total),ic:'◩',f:'Entered manually · '+published+' published'}].map(k=>`<div class="kpi"><div class="kpi-head"><span>${k.a}</span><span class="kpi-icon">${k.ic}</span></div><div class="kpi-value">${k.v}</div><div class="kpi-foot">${k.f}</div></div>`).join('')}</div>
  <div class="grid-main"><section class="panel"><div class="panel-head"><h2>Recent content</h2><button class="eyelink" data-nav="studio">View all →</button></div>
- ${state.projects.length?`<div class="tablewrap"><table class="data-table"><thead><tr><th>Video</th><th>Channel</th><th>Status</th><th></th></tr></thead><tbody>${[...state.projects].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6).map(p=>`<tr><td class="title-cell">${esc(p.title)}<span class="subcell">${p.kind==='clip'?'✂ Clip':'✦ Original'} · ${esc(p.duration)} sec</span></td><td>${esc(channel(p.channelId)?.name||'Unassigned')}</td><td>${status(p.status)}</td><td><button class="kebab" title="Edit" data-action="edit-content" data-id="${p.id}">Edit</button></td></tr>`).join('')}</tbody></table></div>`:empty('🎬','No videos yet','Create your first video project to start building your content pipeline.','Create a project','new-content')}
+ ${state.projects.length?`<div class="tablewrap"><table class="data-table"><thead><tr><th>Video</th><th>Channel</th><th>Status</th><th></th></tr></thead><tbody>${[...state.projects].sort((a,b)=>b.createdAt.localeCompare(a.createdAt)).slice(0,6).map(p=>`<tr><td class="title-cell">${esc(p.title)}<span class="subcell">${p.kind==='clip'?'✂ Clip':'✦ Original'} · ${esc(p.duration)} sec</span></td><td>${esc(channel(p.channelId)?.name||'Unassigned')}</td><td>${status(p.status)}</td><td><button class="kebab" title="Edit" data-action="edit-content" data-id="${esc(p.id)}">Edit</button></td></tr>`).join('')}</tbody></table></div>`:empty('🎬','No videos yet','Create your first video project to start building your content pipeline.','Create a project','new-content')}
  </section><section class="panel"><div class="panel-head"><h2>Get started</h2><span class="tiny-muted">SETUP CHECKLIST</span></div>
  ${[['1','Create your channel groups','Start with gaming, podcast or original AI videos.',state.channels.length>0],['2','Prepare your first project','Enter a source video, timings and/or script.',state.projects.length>0],['3','Open Production flow','Make a local MP4 if Python and FFmpeg are available.',false]].map(x=>`<div class="step"><div class="step-number">${x[3]?'✓':x[0]}</div><div><div class="step-title">${x[1]}</div><div class="step-text">${x[2]}</div></div></div>`).join('')}
  <div class="notice">🔒 This dashboard does not publish or process video by itself. Automated YouTube discovery is available as an optional GitHub workflow; importing its report is manual. Publishing and AI generation remain future integrations.</div></section></div>
@@ -130,7 +185,7 @@ function overview(){
 }
 function channelCard(c){
  const count=projectsFor(c.id).length;
- return `<article class="channel-card" style="--accent:${esc(c.color||palettes[0])}"><div class="channel-top"><span class="channel-avatar">${esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="tiny-muted">${count} projects</span></div><h3 class="channel-name">${esc(c.name)}</h3><div class="channel-type">${esc(c.niche||'Uncategorised content')}</div><div class="platforms"><span class="platform">▶ YouTube ${c.youtubeHandle?'· '+esc(c.youtubeHandle):'· not linked'}</span><span class="platform">◎ Instagram ${c.instagramHandle?'· '+esc(c.instagramHandle):'· not linked'}</span><span class="platform">♪ TikTok ${c.tiktokHandle?'· '+esc(c.tiktokHandle):'· not linked'}</span><span class="platform">f Facebook ${c.facebookHandle?'· '+esc(c.facebookHandle):'· not linked'}</span></div><div class="card-actions"><button class="button tiny button-ghost" data-action="edit-channel" data-id="${c.id}">Edit channel</button><button class="button tiny" data-action="new-content" data-channel="${c.id}">＋ Content</button></div></article>`;
+ return `<article class="channel-card" style="--accent:${esc(c.color||palettes[0])}"><div class="channel-top"><span class="channel-avatar">${esc((c.name||'?').slice(0,1).toUpperCase())}</span><span class="tiny-muted">${count} projects</span></div><h3 class="channel-name">${esc(c.name)}</h3><div class="channel-type">${esc(c.niche||'Uncategorised content')}</div><div class="platforms"><span class="platform">▶ YouTube ${c.youtubeHandle?'· '+esc(c.youtubeHandle):'· not linked'}</span><span class="platform">◎ Instagram ${c.instagramHandle?'· '+esc(c.instagramHandle):'· not linked'}</span><span class="platform">♪ TikTok ${c.tiktokHandle?'· '+esc(c.tiktokHandle):'· not linked'}</span><span class="platform">f Facebook ${c.facebookHandle?'· '+esc(c.facebookHandle):'· not linked'}</span></div><div class="card-actions"><button class="button tiny button-ghost" data-action="edit-channel" data-id="${esc(c.id)}">Edit channel</button><button class="button tiny" data-action="new-content" data-channel="${esc(c.id)}">＋ Content</button></div></article>`;
 }
 function channelsPage(){return `${heading('BRANDS & ACCOUNTS','Your channels','Manage your YouTube Shorts, Instagram Reels, TikTok and Facebook accounts by brand.',`<button class="button button-primary" data-action="new-channel">＋ Add channel</button>`)}
  <div class="notice" style="margin-bottom:21px">Names and @handles are planning information only. Entering a handle does <strong>not</strong> connect an account or enable publishing. OAuth integration comes later.</div>
@@ -471,7 +526,7 @@ function studioPage(){const list=state.projects.filter(p=>filter==='all'||p.kind
  </div>
  ${list.length?`<div class="library-count" id="studio-filter-count" aria-live="polite">Showing ${list.length} projects</div><div id="studio-projects">${tableProjects(list)}</div><div id="studio-no-matches" class="notice" hidden>No projects match those filters. Try another search or channel.</div>`:empty('✦','Nothing in this collection','Add your first content project.','New project','new-content')}`;
 }
-function tableProjects(list){return `<div class="tablewrap"><table class="data-table"><thead><tr><th>Project</th><th>Channel</th><th>Status</th><th>Next release</th><th>Actions</th></tr></thead><tbody>${[...list].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(p=>`<tr data-project-id="${esc(p.id)}"><td class="title-cell">${esc(p.title)}<span class="subcell">${p.kind==='clip'?'✂ Clip':'✧ Original'} · ${esc(p.duration||'30')} sec</span></td><td>${esc(channel(p.channelId)?.name||'Unassigned')}</td><td>${status(p.status)}</td><td>${p.schedule?esc(dateStr(p.schedule)):'—'}</td><td><div class="inline-actions"><button class="kebab" title="Edit project" data-action="edit-content" data-id="${p.id}">Edit</button><button class="kebab" title="Export render job" data-action="export-job" data-id="${p.id}">⇩ Job</button><button class="kebab" title="Preview & time captions" data-action="preview-project" data-id="${p.id}">▶ Preview</button><button class="kebab" title="Copy title and description" data-action="copy-caption" data-id="${p.id}">Copy</button></div></td></tr>`).join('')}</tbody></table></div>`}
+function tableProjects(list){return `<div class="tablewrap"><table class="data-table"><thead><tr><th>Project</th><th>Channel</th><th>Status</th><th>Next release</th><th>Actions</th></tr></thead><tbody>${[...list].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||'')).map(p=>`<tr data-project-id="${esc(p.id)}"><td class="title-cell">${esc(p.title)}<span class="subcell">${p.kind==='clip'?'✂ Clip':'✧ Original'} · ${esc(p.duration||'30')} sec</span></td><td>${esc(channel(p.channelId)?.name||'Unassigned')}</td><td>${status(p.status)}</td><td>${p.schedule?esc(dateStr(p.schedule)):'—'}</td><td><div class="inline-actions"><button class="kebab" title="Edit project" data-action="edit-content" data-id="${esc(p.id)}">Edit</button><button class="kebab" title="Export render job" data-action="export-job" data-id="${esc(p.id)}">⇩ Job</button><button class="kebab" title="Preview & time captions" data-action="preview-project" data-id="${esc(p.id)}">▶ Preview</button><button class="kebab" title="Copy title and description" data-action="copy-caption" data-id="${esc(p.id)}">Copy</button></div></td></tr>`).join('')}</tbody></table></div>`}
 function applyStudioFilters(){
  const host=$('#studio-projects');if(!host)return;
  const query=str($('#studio-search')?.value).toLowerCase();
@@ -761,6 +816,7 @@ async function previewImport(file){
 }
 function renderBlockers(p){
  const issues=[];
+ if(captionsAreStale(p))issues.push('Narration changed: refresh subtitle timing before rendering');
  if(!p.rights) issues.push('Permission to use footage/audio not confirmed');
  if(p.kind!=='original' && !p.sourcePath && !p.sourceUrl) issues.push('No source footage selected');
  if(p.sourceUrl && !/^https:\/\//i.test(p.sourceUrl)) issues.push('Media link must be a direct HTTPS URL');
@@ -770,6 +826,7 @@ function renderBlockers(p){
  if(p.kind==='original' && /\[(RESEARCH|EXAMPLE|PAYOFF|HOOK|MAIN|END)\]/i.test(p.script||'')) issues.push('Replace research placeholders in the script');
  if(p.kind==='original' && p.series && !/[.!?]+(?:["'”’])?$/.test(String(p.script||'').trim()))
   issues.push('Story episode must end at a complete sentence, not an abrupt cut');
+ if(p.series&&window.DClipsSeries?.PROFILES[p.series.platform]&&Number(p.duration)>window.DClipsSeries.PROFILES[p.series.platform].max)issues.push('Finished episode exceeds the selected platform limit; split and render again');
  if(p.kind==='original' && p.series && p.voiceMode==='none')
   issues.push('Narrated story has no voice: choose an AI narrator or attach a voice recording');
  if(p.kind==='original' && ['storyboard','illustrated'].includes(p.visualMode) && (p.sourcePath||p.sourceUrl)) issues.push('Storyboard needs generated background: click Use generated background in Production flow');
@@ -1182,7 +1239,7 @@ function modalFrame(title,body,save='Save changes'){return `<form id="editor-for
 function input(name,label,value='',placeholder='',type='text',extra=''){return `<div class="form-field"><label for="field-${name}">${label}</label><input class="field" id="field-${name}" name="${name}" value="${esc(value)}" placeholder="${esc(placeholder)}" type="${type}" ${extra}></div>`}
 function select(name,label,value,options){return `<div class="form-field"><label for="field-${name}">${label}</label><select class="field" id="field-${name}" name="${name}">${options.map(([v,l])=>`<option value="${esc(v)}" ${value===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div>`}
 function textarea(name,label,value='',help='',rows=4){return `<div class="form-field span2"><label for="field-${name}">${label}</label><textarea class="field" name="${name}" id="field-${name}" rows="${rows}">${esc(value)}</textarea>${help?`<div class="field-help">${esc(help)}</div>`:''}</div>`}
-function openChannel(id){const c=id?channel(id):null;const co=c||{name:'',niche:'',color:palettes[0],youtubeHandle:'',instagramHandle:'',tiktokHandle:'',facebookHandle:'',notes:''};showModal(modalFrame(c?'Edit channel':'Create channel',`<div class="form-grid">${input('name','Channel / brand name',co.name,'e.g. Pixel Highlights','text','required maxlength="80"')}${input('niche','Content niche',co.niche,'Gaming clips, AI stories, podcasts')}${input('youtubeHandle','YouTube handle (optional)',co.youtubeHandle,'@mybrand')}${input('instagramHandle','Instagram handle (optional)',co.instagramHandle,'@mybrand')}${input('tiktokHandle','TikTok username (optional)',co.tiktokHandle,'@mybrand')}${input('facebookHandle','Facebook Page (optional)',co.facebookHandle,'Page name')}${select('color','Channel colour',co.color,palettes.map((v,i)=>[v,['Violet','Pink','Teal','Orange','Green','Blue'][i]]))}${textarea('notes','Brand notes',co.notes,'Target audience, editorial tone, posting ideas.')}</div><p class="footnote">Handles are labels only. No accounts are linked in this version.</p>${c?`<button type="button" class="button button-danger tiny" data-action="delete-channel" data-id="${c.id}">Delete channel and projects</button>`:``}`,c?'Save channel':'Create channel'));$('#editor-form').dataset.entity='channel';$('#editor-form').dataset.id=id||''}
+function openChannel(id){const c=id?channel(id):null;const co=c||{name:'',niche:'',color:palettes[0],youtubeHandle:'',instagramHandle:'',tiktokHandle:'',facebookHandle:'',notes:''};showModal(modalFrame(c?'Edit channel':'Create channel',`<div class="form-grid">${input('name','Channel / brand name',co.name,'e.g. Pixel Highlights','text','required maxlength="80"')}${input('niche','Content niche',co.niche,'Gaming clips, AI stories, podcasts')}${input('youtubeHandle','YouTube handle (optional)',co.youtubeHandle,'@mybrand')}${input('instagramHandle','Instagram handle (optional)',co.instagramHandle,'@mybrand')}${input('tiktokHandle','TikTok username (optional)',co.tiktokHandle,'@mybrand')}${input('facebookHandle','Facebook Page (optional)',co.facebookHandle,'Page name')}${select('color','Channel colour',co.color,palettes.map((v,i)=>[v,['Violet','Pink','Teal','Orange','Green','Blue'][i]]))}${textarea('notes','Brand notes',co.notes,'Target audience, editorial tone, posting ideas.')}</div><p class="footnote">Handles are labels only. No accounts are linked in this version.</p>${c?`<button type="button" class="button button-danger tiny" data-action="delete-channel" data-id="${esc(c.id)}">Delete channel and projects</button>`:``}`,c?'Save channel':'Create channel'));$('#editor-form').dataset.entity='channel';$('#editor-form').dataset.id=id||''}
 function openProject(id,opts={}){
  if(!state.channels.length){notice('Add a channel first so the project has somewhere to go.');openChannel();return}
  const p=id?state.projects.find(x=>x.id===id):null;
@@ -1230,7 +1287,7 @@ function openProject(id,opts={}){
 
  ${textarea('notes','Editing notes',co.notes,'Hook, transitions, credit or creative notes',2)}
  <label class="checkbox-row" style="grid-column:1/-1"><input type="checkbox" name="rights" ${co.rights?'checked':''}><span>I own or have appropriate permission to use the source footage and any music. I will review the output before publishing.</span></label>
- </div><p class="footnote">Original narrated projects can render a simple generated background without supplied footage. Clips require owned/licensed footage. YouTube watch URLs cannot be rendered. Enter a direct MP4 link or a media path. No source video is transferred or saved in this browser.</p>${p?`<button type="button" class="button button-danger tiny" data-action="delete-project" data-id="${p.id}">Delete project</button>`:``}`,p?'Save project':'Create project'));
+ </div><p class="footnote">Original narrated projects can render a simple generated background without supplied footage. Clips require owned/licensed footage. YouTube watch URLs cannot be rendered. Enter a direct MP4 link or a media path. No source video is transferred or saved in this browser.</p>${p?`<button type="button" class="button button-danger tiny" data-action="delete-project" data-id="${esc(p.id)}">Delete project</button>`:``}`,p?'Save project':'Create project'));
  $('#editor-form').dataset.entity='project';$('#editor-form').dataset.id=id||'';
 }
 function submitEditor(form){let fd=new FormData(form),raw=k=>str(fd.get(k));let id=form.dataset.id;let now=new Date().toISOString();
@@ -1267,7 +1324,18 @@ function jobExport(id){const p=state.projects.find(p=>p.id===id);if(!p)return;
 }
 function doDemo(){const now=new Date().toISOString();const c=[{id:uid(),name:'Pixel Highlights',niche:'Gaming clips',color:palettes[0],youtubeHandle:'',instagramHandle:'',notes:'Fast edits and humour',createdAt:now},{id:uid(),name:'The Conversation Cut',niche:'Podcast highlights',color:palettes[1],youtubeHandle:'',instagramHandle:'',notes:'Engaging interviews',createdAt:now},{id:uid(),name:'Curiosity Daily',niche:'Original narrated facts',color:palettes[2],youtubeHandle:'',instagramHandle:'',notes:'Science and history',createdAt:now}];state.channels.push(...c);
  state.projects.push({id:uid(),title:'The moment everything changed',kind:'clip',channelId:c[0].id,status:'draft',sourcePath:'assets/example-background.mp4',sourceUrl:'',start:0,duration:8,voiceMode:'none',audioPath:'',script:'This is just a demo caption.\nReplace it with your own licensed footage.',ytTitle:'',igCaption:'',description:'#gaming #shorts',schedule:'',viewsYT:0,viewsIG:0,notes:'Sample only · fictional project',rights:false,createdAt:now,updatedAt:now},{id:uid(),title:'3 things you did not know about space',kind:'original',channelId:c[2].id,status:'idea',sourcePath:'assets/example-background.mp4',sourceUrl:'',start:0,duration:15,voiceMode:'basic',audioPath:'',script:'Space is full of surprises.\nLight from the sun takes about eight minutes to reach Earth.\nWhat would you like to learn next?',ytTitle:'',igCaption:'',description:'#space #facts #shorts',schedule:'',viewsYT:0,viewsIG:0,notes:'Sample only · fictional project',rights:true,createdAt:now,updatedAt:now});state.demo=true;save();render();notice('Added example channels and projects. They are sample data only.')}
-function importBackup(file){if(!file)return; if(file.size>2*1024*1024){notice('Backup file is too large.');return}const fr=new FileReader();fr.onload=()=>{try{const data=JSON.parse(fr.result);if(data.version!==1||!Array.isArray(data.channels)||!Array.isArray(data.projects)||data.channels.length>1000||data.projects.length>10000|| (data.scoutReports && (!Array.isArray(data.scoutReports)||data.scoutReports.length>20)) || (data.trends && (!Array.isArray(data.trends)||data.trends.length>1000)) || (data.discovery && (!Array.isArray(data.discovery.items)||data.discovery.items.length>500)))throw Error('Invalid backup format');if(!confirm(`Replace local workspace with ${data.channels.length} channels and ${data.projects.length} projects?`))return;state=data;if(!Array.isArray(state.scoutReports))state.scoutReports=[];if(!Array.isArray(state.trends))state.trends=[];if(!state.discovery || !Array.isArray(state.discovery.items))state.discovery=null;if(!Number.isSafeInteger(state.viralThreshold)||state.viralThreshold<1)state.viralThreshold=100000;save();render();notice('Backup imported.')}catch(err){notice('Cannot import: invalid Shorts Studio backup.')}};fr.readAsText(file)}
+function importBackup(file){
+ if(!file)return;if(file.size>2*1024*1024){notice('Backup file is too large.');return;}
+ const fr=new FileReader();fr.onload=()=>{
+  try{
+   const data=validateWorkspace(JSON.parse(fr.result));
+   if(!confirm(`Replace local workspace with ${data.channels.length} channels and ${data.projects.length} projects?`))return;
+   const previous=state;state=data;workspaceLoadError='';lastSavedWorkspace=localStorage.getItem(STORE_KEY);
+   if(!save()){state=previous;throw Error('Backup could not be saved.');}
+   productionProjectId='';render();notice('Backup imported.');
+  }catch(err){notice(err.message||'Invalid workspace backup.');}
+ };fr.readAsText(file);
+}
 // A simple script starter — explicitly not presented as a connected AI service.
 function suggestScript(){const title=str($('#field-title')?.value)||'your topic';const target=$('#field-script');if(!target)return;if(target.value.trim()&&!confirm('Replace the existing script with a starter outline?'))return;
  target.value=`[HOOK] Here is something interesting about ${title}.\n\n[MAIN] Explain the most surprising fact in your own words. Include a verifiable source and an example.\n\n[END] What do you think?`;
@@ -1285,10 +1353,48 @@ let productionVideoFile=null;
 let productionRenderUrl='';
 let productionTask='';
 let productionBusy=false;
+let productionEditRevision=0;
 let productionStoryboardTime=0;
 let productionStoryboardTimer=null;
 let productionBackend={local:false,ffmpeg:false,transcriber:false,image_generation_available:false};
 
+function mediaStore(action,key,value){
+ return new Promise((resolve,reject)=>{
+  if(typeof indexedDB==='undefined'){reject(Error('Persistent media storage is unavailable in this browser.'));return;}
+  const open=indexedDB.open('dclips-media-v1',1);
+  open.onupgradeneeded=()=>{open.result.createObjectStore('assets');};
+  open.onerror=()=>reject(open.error);
+  open.onsuccess=()=>{
+   const db=open.result,tx=db.transaction('assets',action==='get'?'readonly':'readwrite'),store=tx.objectStore('assets');
+   const request=action==='get'?store.get(key):action==='delete'?store.delete(key):store.put(value,key);
+   tx.oncomplete=()=>{db.close();resolve(request.result);};
+   tx.onerror=()=>{db.close();reject(tx.error||Error('Could not save media.'));};
+   tx.onabort=()=>{db.close();reject(tx.error||Error('Media save cancelled.'));};
+  };
+ });
+}
+async function persistCloudImages(id){
+ const item=cloudImagePacks.get(id);
+ try{if(item)await mediaStore('put','images:'+id,{files:item.files,slots:item.slots.map(f=>item.files.indexOf(f))});
+ else await mediaStore('delete','images:'+id);}
+ catch(e){notice('Pictures are usable now but could not be saved for reload. Download the render pack before closing this page.');}
+}
+const mediaRestoring=new Set();
+async function restoreProjectMedia(id){
+ if(!id||mediaRestoring.has(id)||typeof indexedDB==='undefined')return;
+ mediaRestoring.add(id);
+ const revision=productionEditRevision;
+ try{
+  const [pictures,video]=await Promise.all([mediaStore('get','images:'+id),mediaStore('get','video:'+id)]);
+  if(revision!==productionEditRevision)return;
+  if(pictures&&!cloudImagePacks.has(id)&&Array.isArray(pictures.files)&&Array.isArray(pictures.slots)){
+   const files=pictures.files;cloudImagePacks.set(id,{files,slots:pictures.slots.map(i=>files[i]||null),urls:new Map(files.map(f=>[f,URL.createObjectURL(f)]))});
+  }
+  if(video&&!cloudFinishedPreviews.has(id)&&video.file instanceof Blob){cloudFinishedPreviews.set(id,{url:URL.createObjectURL(video.file),name:video.name,fingerprint:video.fingerprint});}
+  if(page==='production'&&productionProjectId===id){cloudPaint();const player=$('#cloud-preview-player');if(video&&!player)render();}
+ }catch(e){notice('Saved media could not be restored; reselect your local files.');}
+ finally{mediaRestoring.delete(id);}
+}
 function productionProject(){return state.projects.find(p=>p.id===productionProjectId)||null}
 function productionMediaPath(p){return String(p?.sourcePath||'')}
 function productionPreviewUrl(p){
@@ -1299,11 +1405,12 @@ function productionPreviewUrl(p){
  return productionBackend.local&&match?`/local-media/${match[1]}`:'';
 }
 function productionLoadProject(id){
+ productionEditRevision++;
  productionStopStoryboard();
  if(productionVideoBlobUrl)URL.revokeObjectURL(productionVideoBlobUrl);
  productionProjectId=id||'';watchedSeriesRenderKey='';productionVideoUrl='';productionVideoBlobUrl='';productionVideoFile=null;productionRenderUrl='';productionTask='';
  try{productionCues=parseTimedCaptions(productionProject()?.timedCaptions,productionProject()?.duration||30)}catch(_){productionCues=[]}
- render();productionCheckBackend();
+ render();productionCheckBackend();restoreProjectMedia(productionProjectId);
 }
 function seriesRevisionPanel(current,last,outputUrl){
  if(!current?.series||current.series.superseded||(!last&&!cloudFinishedPreviews.has(current.id))||(!outputUrl&&!cloudFinishedPreviews.has(current.id)))return '';
@@ -1348,6 +1455,7 @@ async function cloudReceiveVideo(file){
   if(previous)URL.revokeObjectURL(previous.url);
   cloudFinishedPreviews.set(p.id,{url:URL.createObjectURL(file),name:originalName,fingerprint:renderFingerprint(p)});
   watchedSeriesRenderKey='';
+  try{await mediaStore('put','video:'+p.id,{file,name:originalName,fingerprint:renderFingerprint(p)});}catch(_){notice('Video opened but could not be saved for reload. Keep the original MP4.');return;}
   render();notice('Finished online video ready for review. Watch it through to the end before revising.');
  }catch(e){notice('Could not open GitHub video artifact: '+e.message)}
 }
@@ -1378,7 +1486,7 @@ function cloudImagePanel(current){
  const set=cloudImagePacks.get(current.id),scenes=current.visualScenes||[];
  return `<section class="panel" style="margin-top:14px" aria-label="Free online video rendering">
  <div class="panel-head"><h2>ChatGPT image pack → online video</h2><span class="tiny-muted">NO PC RENDERING</span></div>
- <p class="secondary-note">Save your ChatGPT illustrations as <strong>one ZIP</strong> (when ChatGPT offers one), or as separate pictures. Select the ZIP or all images in one go. Filenames such as 01-cover, 02-scene and 03-scene match automatically; other images sort alphabetically. Pictures stay in your browser until you download your private render pack.</p>
+ <p class="secondary-note">Save your ChatGPT illustrations as <strong>one ZIP</strong> (when ChatGPT offers one), or as separate pictures. Select the ZIP or all images in one go. Filenames such as 01-cover, 02-scene and 03-scene match automatically; other images sort alphabetically. Pictures are saved in this browser for reload. Keep a downloaded render pack as a backup; clearing browser data removes local copies.</p>
  <div class="split-buttons" style="margin-bottom:12px"><button class="button button-ghost" type="button" data-action="cloud-copy-prompt">Copy ChatGPT image request for this episode</button><a href="https://chatgpt.com/" target="_blank" rel="noopener noreferrer" class="button button-ghost">Open ChatGPT ↗</a></div>
  <div class="production-upload"><input id="production-cloud-images" type="file" accept="image/png,image/jpeg,image/webp,.zip,application/zip" multiple aria-label="Choose an image ZIP or select all illustrated scene images"><button type="button" class="button button-ghost" data-action="cloud-clear">Clear selected pictures</button></div>
  <div id="cloud-scene-list">${cloudImageList(current)}</div>
@@ -1425,6 +1533,7 @@ async function cloudImagesSelected(files){
   if(old)for(const url of old.urls.values())URL.revokeObjectURL(url);
   const urls=new Map(input.map(file=>[file,URL.createObjectURL(file)]));
   cloudImagePacks.set(p.id,{files:input,slots:result.slots,urls});
+  await persistCloudImages(p.id);
   cloudPaint();
   notice('Ready: '+result.slots.filter(Boolean).length+' pictures matched to scenes. Review them, then download the cloud render pack.');
  }catch(e){notice('Cannot import images: '+e.message)}
@@ -1436,13 +1545,14 @@ function cloudSwitchScene(index,selected){
  if(choice!==-1&&!newFile)return;
  const previous=set.slots.indexOf(newFile);
  if(previous>=0&&previous!==index)set.slots[previous]=set.slots[index];
- set.slots[index]=newFile;cloudPaint();
+ set.slots[index]=newFile;cloudPaint();persistCloudImages(p.id);
 }
 function cloudClear(){
  const p=productionProject(),set=p&&cloudImagePacks.get(p.id);
  if(set){for(const u of set.urls.values())URL.revokeObjectURL(u);cloudImagePacks.delete(p.id);}
+ if(p)persistCloudImages(p.id);
  const input=$('#production-cloud-images');if(input)input.value='';
- cloudPaint();notice('Temporary browser images cleared. Saved project scenes were not deleted.');
+ cloudPaint();notice('Saved browser images cleared. Saved project scenes were not deleted.');
 }
 async function cloudExport(){
  const p=productionProject();
@@ -1471,6 +1581,11 @@ async function cloudExport(){
  }catch(e){notice('Online render pack not ready: '+e.message)}finally{productionBusy=false;}
 }
 
+function renderHistoryPanel(){
+ const records=(state.renderHistory||[]).filter(r=>/^\/output\/[0-9a-f]{32}\/[a-z0-9-]{1,50}\.mp4$/.test(r.url||'')).slice(-10).reverse();
+ if(!records.length)return '';
+ return '<details class="panel"><summary>Recent completed renders (including earlier revisions)</summary>'+records.map(r=>`<p>${esc(r.title||'Video')} · ${esc(dateStr(r.renderedAt))} ${productionBackend.local?`<a href="${esc(r.url)}" download>Download MP4</a>`:'Open the local engine to download.'} ${r.reviewError?esc(r.reviewError):''}</p>`).join('')+'</details>';
+}
 function productionPage(){
  const p=productionProject()||state.projects[0]||null;
  if(p&&!productionProjectId){productionProjectId=p.id;try{productionCues=parseTimedCaptions(p.timedCaptions,p.duration)}catch(_){productionCues=[]}}
@@ -1480,7 +1595,7 @@ function productionPage(){
  const last=current?latestRender(current):null;
  const outputUrl=(last&&productionBackend.local?last.url:productionRenderUrl);
  return `${heading('ONE WORKFLOW · v0.14','Production flow','Script → narration → timed captions → preview → MP4, from one page.',`<button class="button button-primary" data-action="production-save" ${!current?'disabled':''}>✓ Save progress</button>`)}
- <div class="production-steps"><div><span>01</span> Prepare</div><div><span>02</span> Subtitles</div><div><span>03</span> Preview</div><div><span>04</span> Export</div></div>
+ ${renderHistoryPanel()}${current&&captionsAreStale(current)?'<div class="notice warn">Narration changed. Existing captions need new timing. <button class="button" data-action="production-retime">Refresh subtitle timing</button></div>':''}<div class="production-steps"><div><span>01</span> Prepare</div><div><span>02</span> Subtitles</div><div><span>03</span> Preview</div><div><span>04</span> Export</div></div>
  <div class="notice production-status" id="production-backend">Checking local render engine. The planning editor also works without Python or FFmpeg.</div>
  ${!state.projects.length?`<div class="panel" style="margin:15px 0">${empty('✧','No projects yet','Create a channel and project in Content Studio first, or load demo data to try this production flow.','Create a project','new-content')}<button class="button small" data-action="demo">Load sample channels & projects</button></div>`:''}
  <div class="production-grid"><section class="panel production-editor">
@@ -1658,6 +1773,7 @@ async function productionCheckBackend(){
 }
 function productionDraftSave(){
  const p=productionProject();if(!p)throw Error('Choose a project first.');
+ if(p.timedCaptions&&!p.captionNarrationKey)p.captionNarrationKey=captionNarrationKey(p);
  const title=str($('#production-title')?.value).slice(0,150);
  const script=$('#production-script')?.value||'';
  if(p.script!==script)p.scenePlanText=[];
@@ -1707,6 +1823,7 @@ function productionApplyText(){
 }
 function productionSave(){try{productionDraftSave();notice('Script, timings and settings saved to this project.')}catch(e){notice(e.message)}}
 function productionEstimate(){
+ try{productionDraftSave()}catch(e){notice(e.message);return;}
  const script=$('#production-script')?.value||'';
  const duration=Number($('#production-length')?.value)||30;
  if(!script.trim()||/\[(RESEARCH|EXAMPLE|PAYOFF|HOOK|MAIN|END)\]/i.test(script)){notice('Write a complete script first; research placeholders cannot be timed.');return}
@@ -1716,6 +1833,7 @@ function productionEstimate(){
  if(groups.length>900){notice('Script too long for this caption style.');return}
  const weight=groups.map(c=>Math.max(1,c.split(' ').length));const total=weight.reduce((a,b)=>a+b,0);
  let at=0;productionCues=groups.map((text,i)=>{const start=at;at=i===groups.length-1?duration:at+duration*weight[i]/total;return {start_seconds:+start.toFixed(3),end_seconds:+at.toFixed(3),text}});
+ const p=productionProject();if(p)p.captionNarrationKey=captionNarrationKey(p);
  productionPaint();notice('Estimated timings created. These are NOT speech-synchronised; review or run transcription.');
 }
 async function productionAPI(path,body,filename){
@@ -1830,7 +1948,7 @@ function productionDemo(){const p=productionProject();if(!p)return;
  if($('#production-source'))$('#production-source').textContent=p.sourcePath;
  productionRestoreDisplay();notice('Included sample selected. Its licence covers the included test footage only.');
 }
-async function productionImport(file){if(!file)return;try{if(file.size>400000)throw Error('Subtitle file too large.');const text=await file.text();productionCues=parseTimedCaptions(JSON.stringify(parseSubtitleFile(text,file.name)),Number($('#production-length')?.value));productionPaint();notice(`Imported ${productionCues.length} subtitle cues. Review them before saving.`)}catch(e){notice(`Cannot import subtitles: ${e.message}`)}}
+async function productionImport(file){if(!file)return;try{if(file.size>400000)throw Error('Subtitle file too large.');const text=await file.text();productionCues=parseTimedCaptions(JSON.stringify(parseSubtitleFile(text,file.name)),Number($('#production-length')?.value));const p=productionDraftSave();p.captionNarrationKey=captionNarrationKey(p);save();productionPaint();notice(`Imported ${productionCues.length} subtitle cues. Review them before saving.`)}catch(e){notice(`Cannot import subtitles: ${e.message}`)}}
 async function productionPoll(id){
  for(let step=0;step<600;step++){
   await new Promise(r=>setTimeout(r,1100));
@@ -1850,8 +1968,38 @@ async function productionTranscribe(){const p=productionProject();if(!p)return;
  if(productionBusy)return;productionBusy=true;
  try{
   productionDraftSave();const result=await productionAPI('/api/transcribe',{media:p.voiceMode==='file'&&p.audioPath||p.sourcePath,start:p.voiceMode==='file'?0:p.start,duration:p.duration,model:'tiny'});
-  const completed=await productionPoll(result.task_id);productionCues=parseTimedCaptions(JSON.stringify(completed.caption_segments),p.duration);productionPaint();notice('Speech transcription complete. Check every word and time before rendering.');
+  const completed=await productionPoll(result.task_id);if(productionProjectId!==p.id)throw Error('Project changed; retry transcription in the intended project.');productionCues=parseTimedCaptions(JSON.stringify(completed.caption_segments),p.duration);p.captionNarrationKey=captionNarrationKey(p);productionPaint();notice('Speech transcription complete. Check every word and time before rendering.');
  }catch(e){notice(`Transcription failed: ${e.message}`)}finally{productionBusy=false}
+}
+function completeProductionRender(snapshot, submittedFingerprint, done, editorRevision){
+ const p=state.projects.find(item=>item.id===snapshot.id);
+ const record={url:done.video_url,fingerprint:submittedFingerprint,quality:done.quality_report||null,
+  renderedAt:new Date().toISOString(),approved:false,projectId:snapshot.id,title:snapshot.title};
+ if(!/^\/output\/[0-9a-f]{32}\/[a-z0-9-]{1,50}\.mp4$/.test(record.url||''))throw Error('Unexpected output path.');
+ // Persist every completion, including deleted projects and earlier revisions.
+ state.renderHistory=[...(state.renderHistory||[]),record].slice(-30);
+ const active=p&&productionProjectId===p.id&&page==='production';
+ const unchanged=p&&renderFingerprint(p)===submittedFingerprint&&(!active||productionEditRevision===editorRevision);
+ if(!unchanged){save();return {current:false,record,message:'Earlier revision finished and saved in render history. Current edits were preserved.'};}
+ const actual=Number(done.actual_duration_seconds??done.quality_report?.duration_seconds);
+ if(!Number.isFinite(actual)||actual<3||actual>(p.kind==='original'?600:180)){
+  record.reviewError='Finished duration is missing or outside the supported range.';save();
+  return {current:false,record,message:'Video retained in render history, but its duration needs review.'};
+ }
+ p.requestedDuration=snapshot.requestedDuration??snapshot.duration;
+ p.duration=actual;
+ if(Array.isArray(done.caption_segments)){
+  try{
+   const cues=parseTimedCaptions(JSON.stringify(done.caption_segments),actual);
+   p.timedCaptions=JSON.stringify(cues);
+   p.captionNarrationKey=captionNarrationKey(p);
+   if(active)productionCues=cues;
+  }catch(e){record.reviewError='Caption import failed: '+e.message;}
+ }
+ record.fingerprint=renderFingerprint(p);
+ p.lastRender=record;
+ if(!save())throw Error('Video rendered but review status could not be saved. Export a backup.');
+ return {current:true,active,record,message:'MP4 ready. Watch the complete output before approval.'};
 }
 async function productionRender(){
  if(productionBusy)return;
@@ -1859,29 +2007,18 @@ async function productionRender(){
  if(!productionBackend.local||!productionBackend.ffmpeg){notice('Rendering needs the local engine plus Python and FFmpeg. Export the job JSON instead.');return}
  if(p.sourcePath&&p.sourcePath!=='assets/example-background.mp4'&&!p.sourcePath.startsWith('user-data/media/')){notice('Select and upload the source video using this page first.');return}
  if(p.voiceMode==='file'&&!p.audioPath.startsWith('user-data/media/')){notice('Upload the voice recording through this page.');return}
- if(p.sourceUrl){notice('The local renderer cannot import social-platform links. Upload authorised media instead.');return}
+ if(p.sourceUrl){notice('Upload authorised media instead of a remote link.');return}
+ const snapshot=JSON.parse(JSON.stringify(p)),submittedFingerprint=renderFingerprint(snapshot),editorRevision=productionEditRevision;
  productionBusy=true;const prog=$('#production-progress');if(prog)prog.textContent='Sending job to local renderer…';
  try{
-  const job=createRenderJob(p);
-  job.auto_align=Boolean($('#production-autoalign')?.checked&&productionBackend.transcriber&&p.voiceMode==='basic');
+  const job=createRenderJob(snapshot);
+  job.auto_align=Boolean($('#production-autoalign')?.checked&&productionBackend.transcriber&&snapshot.voiceMode==='basic');
   const result=await productionAPI('/api/render',job);
   const done=await productionPoll(result.task_id);
-  productionRenderUrl=done.video_url;
-  // Auto-aligned cues are the ones already rendered into this MP4.
-  // Save them before computing the render fingerprint, otherwise the
-  // final review would incorrectly think the newly rendered video is stale.
-  if(Array.isArray(done.caption_segments)){
-   productionCues=parseTimedCaptions(JSON.stringify(done.caption_segments),p.duration);
-   productionPaint();
-   productionDraftSave();
-  }
-  p.lastRender={url:done.video_url,fingerprint:renderFingerprint(p),quality:done.quality_report||null,renderedAt:new Date().toISOString(),approved:false};
-  if(!save())throw Error('Video rendered but could not save review status. Export your workspace backup.');
-  const vid=$('#production-output-video');if(vid){vid.src=productionRenderUrl;vid.load()}
-  let link=$('#production-download');if(!link){link=document.createElement('a');link.id='production-download';link.className='button button-primary small';link.textContent='⇩ Save rendered MP4';document.querySelector('.production-output')?.appendChild(link)}
-  link.href=productionRenderUrl;link.download='';
-  if(prog)prog.textContent='✓ MP4 ready locally. Watch the full output before uploading to any platform.'+(done.warning?' Note: '+done.warning:'');
-  render();notice('Finished MP4 created. Watch it, then complete the approval checklist.');
+  const resultState=completeProductionRender(snapshot,submittedFingerprint,done,editorRevision);
+  if(resultState.current&&resultState.active){productionRenderUrl=done.video_url;render();}
+  if(prog)prog.textContent=resultState.message+(done.warning?' '+done.warning:'');
+  notice(resultState.message);
  }catch(e){if(prog)prog.textContent=`Render failed: ${e.message}`;notice(`Render failed: ${e.message}`)}finally{productionBusy=false}
 }
 function productionApprove(){
@@ -1889,6 +2026,7 @@ function productionApprove(){
  const last=latestRender(p);
  if(!p||!last){notice('Render the current version of your video before approving.');return}
  if(!productionBackend.local){notice('The local renderer must be open to review the actual MP4.');return}
+ if(last.reviewError){notice(last.reviewError);return;}
  if(last.quality?.status==='fail'||!last.quality){notice('A passing technical quality report is required.');return}
  const issues=renderBlockers(p);
  if(issues.length){notice('Review blocked: '+issues[0]);return}
@@ -1898,7 +2036,7 @@ function productionApprove(){
  if(!save()){last.approved=false;notice('Review could not be saved.');return}
  render();notice('Approved for manual handoff. No video has been published.');
 }
-function productionExport(){try{const p=productionDraftSave();const blockers=renderBlockers(p);if(blockers.length)throw Error(blockers.join(' · '));downloadJSON(`production-${p.id}.json`,createRenderJob(p));notice('Render job exported. Actual MP4 requires Python/FFmpeg or GitHub later.')}catch(e){notice(e.message)}}
+function productionExport(){try{const p=productionDraftSave();const blockers=renderBlockers(p);if(blockers.length)throw Error(blockers.join(' · '));downloadJSON(`production-${esc(p.id)}.json`,createRenderJob(p));notice('Render job exported. Actual MP4 requires Python/FFmpeg or GitHub later.')}catch(e){notice(e.message)}}
 
 function productionRebalanceSeries(){
  try{
@@ -1953,7 +2091,7 @@ function productionRebalanceSeries(){
  }catch(e){notice(e.message);}
 }
 function handleClick(ev){let nav=ev.target.closest('[data-nav]');if(nav){navigate(nav.dataset.nav);return}let btn=ev.target.closest('[data-action]');if(!btn)return;let action=btn.dataset.action,id=btn.dataset.id;
- switch(action){case 'asmr-open':navigate('asmr');break;case 'asmr-plan':asmrPlanAction();break;case 'asmr-export':asmrExport();break;case 'cloud-copy-prompt':cloudCopyEpisode();break;case 'cloud-export':cloudExport();break;case 'cloud-clear':cloudClear();break;case 'quick-open':navigate('quick');break;case 'quick-prepare':quickPrepare();break;case 'quick-copy':if(quickPrompt)copyText(quickPrompt);break;case 'quick-copy-images':if(quickPack)copyText(window.DClipsQuick.imagePrompt(quickPack));break;case 'quick-review':quickReview();break;case 'quick-paste-review':quickPasteReview();break;case 'quick-create':quickCreate();break;case 'production-series-rebalance':productionRebalanceSeries();break;case 'series-preview':seriesPreviewAction();break;case 'series-create':seriesCreate();break;case 'series-example':seriesExample();break;case 'series-show-drafts':seriesShowDrafts(id);break;case 'production-approve':productionApprove();break;case 'live-plan':livePlan(id);break;case 'live-delete':state.streamers=(state.streamers||[]).filter(w=>w.id!==id);save();render();notice('Streamer removed.');break;case 'production-remove-commentary':productionRemoveCommentary();break;case 'production-apply-text':productionApplyText();break;case 'production-center-text':moveTextInput('production',true);break;case 'production-play':productionPlayStoryboard();break;case 'production-stop':productionStopStoryboard();break;case 'production-save':productionSave();break;case 'production-estimate':productionEstimate();break;case 'production-upload-video':productionUpload('file');break;case 'production-upload-audio':productionUpload('audio');break;case 'production-demo':productionDemo();break;case 'production-auto-scenes':productionAutoScenes();break;case 'production-create-art':productionGenerateSceneImages();break;case 'production-upload-scene':productionUploadScene();break;case 'production-generated':productionGenerated();break;case 'production-transcribe':productionTranscribe();break;case 'production-import-cues':$('#production-cue-file')?.click();break;case 'production-add-cue':{const t=productionCues.at(-1)?.end_seconds||0;const len=Number($('#production-length')?.value)||30;if(t<len-.1){productionCues.push({start_seconds:t,end_seconds:Math.min(t+1.5,len),text:'New caption'});productionPaint()}break;}case 'production-remove-cue':productionCues.splice(Number(btn.dataset.index),1);productionPaint();break;case 'production-seek':{const vid=$('#production-video');const cue=productionCues[Number(btn.dataset.index)];if(vid&&cue)vid.currentTime=(Number($('#production-start')?.value)||0)+cue.start_seconds;break;}case 'production-render':productionRender();break;case 'production-export':productionExport();break;case 'new-channel':openChannel();break;case 'edit-channel':openChannel(id);break;case 'new-content':openProject(null,{channelId:btn.dataset.channel,kind:btn.dataset.kind});break;case 'edit-content':openProject(id);break;case 'preview-project':previewSelectProject(id);navigate('preview');break;case 'preview-demo':previewDemo();break;case 'preview-add':previewAddCue();break;case 'preview-seek-start':{let v=$('#preview-video');if(v&&v.readyState)v.currentTime=previewStart();break;}case 'preview-jump':{let v=$('#preview-video'),c=previewSegments[Number(btn.dataset.index)];if(v?.readyState&&c)v.currentTime=previewStart()+c.start_seconds;break;}case 'preview-remove':previewSegments.splice(Number(btn.dataset.index),1);previewPaintCues();break;case 'preview-apply-text':previewApplyText();break;case 'preview-center-text':moveTextInput('preview',true);break;case 'preview-remove-voice':previewRemoveCommentary();break;case 'preview-save':previewSave();break;case 'preview-export-srt':previewExportSRT();break;case 'preview-export-json':previewExportJSON();break;case 'preview-export-job':{if(previewProject())jobExport(previewProjectId);break;}case 'close-modal':$('#modal').close();break;case 'go-studio':navigate('studio');break;case 'export-job':jobExport(id);break;case 'export-batch':exportRenderBatch();break;case 'restore-recovery':restoreRecovery(Number(btn.dataset.index));break;case 'backup':downloadJSON(`shorts-studio-backup-${new Date().toISOString().slice(0,10)}.json`,state);notice('Backup downloaded.');break;case 'import':$('#import-file').click();break;case 'import-scout':$('#scout-file').click();break;case 'import-trends':$('#trend-file').click();break;case 'import-discovery':$('#discovery-file').click();break;case 'export-discovery':if(state.discovery)downloadJSON('youtube-discovery-ranked.json',state.discovery);break;case 'track-discovery':trackDiscovery(id);break;case 'idea-discovery':trackDiscovery(id,true);break;case 'new-trend':openTrend();break;case 'edit-trend':openTrend(id);break;case 'delete-trend':deleteTrend(id);break;case 'idea-trend':ideaTrend(id);break;case 'export-trends':exportTrends();break;case 'export-growth':exportGrowth();break;case 'add-candidate':addCandidate(id,Number(btn.dataset.index));break;case 'demo':doDemo();break;case 'reset':if(confirm('Delete all channels, projects, trend watchlists and manual stats in this browser? This cannot be undone.')){state=initial();save();render();notice('Local workspace reset.')}break;case 'delete-channel':if(confirm('Delete this channel and all its projects?')){state.channels=state.channels.filter(x=>x.id!==id);state.projects=state.projects.filter(x=>x.channelId!==id);$('#modal').close();save();render()}break;case 'delete-project':if(confirm('Delete this project?')){state.projects=state.projects.filter(x=>x.id!==id);$('#modal').close();save();render()}break;case 'script-starter':suggestScript();break;case 'generate-concept':generateConcept();break;case 'ai-load-project':loadAiProject();break;case 'ai-existing':{if($('#modal').open)$('#modal').close();let p=state.projects.find(x=>x.id===id);aiPrefill=p?{topic:p.title,angle:(p.notes||'').slice(0,600),mode:p.kind,channelId:p.channelId,projectId:p.id}:null;navigate('ai');break;}case 'ai-build-prompt':buildAiPrompt();break;case 'ai-copy-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)copyText(t);break;}case 'ai-download-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)downloadText('chatgpt-shorts-prompt.txt',t);break;}case 'ai-preview':previewAiReply();break;case 'ai-save-draft':saveAiDraft();break;case 'ai-import-file':$('#ai-file').click();break;case 'save-concept':saveConcept(Number(btn.dataset.index));break;case 'copy-caption':{let p=state.projects.find(x=>x.id===id);if(p)copyText([p.ytTitle||p.title,p.description].filter(Boolean).join('\n\n'));break;}}
+ switch(action){case 'asmr-open':navigate('asmr');break;case 'asmr-plan':asmrPlanAction();break;case 'asmr-export':asmrExport();break;case 'cloud-copy-prompt':cloudCopyEpisode();break;case 'cloud-export':cloudExport();break;case 'cloud-clear':cloudClear();break;case 'quick-open':navigate('quick');break;case 'quick-prepare':quickPrepare();break;case 'quick-copy':if(quickPrompt)copyText(quickPrompt);break;case 'quick-copy-images':if(quickPack)copyText(window.DClipsQuick.imagePrompt(quickPack));break;case 'quick-review':quickReview();break;case 'quick-paste-review':quickPasteReview();break;case 'quick-create':quickCreate();break;case 'production-retime':refreshCaptionAlignment();break;case 'production-series-rebalance':productionRebalanceSeries();break;case 'series-preview':seriesPreviewAction();break;case 'series-create':seriesCreate();break;case 'series-example':seriesExample();break;case 'series-show-drafts':seriesShowDrafts(id);break;case 'production-approve':productionApprove();break;case 'live-plan':livePlan(id);break;case 'live-delete':state.streamers=(state.streamers||[]).filter(w=>w.id!==id);save();render();notice('Streamer removed.');break;case 'production-remove-commentary':productionRemoveCommentary();break;case 'production-apply-text':productionApplyText();break;case 'production-center-text':moveTextInput('production',true);break;case 'production-play':productionPlayStoryboard();break;case 'production-stop':productionStopStoryboard();break;case 'production-save':productionSave();break;case 'production-estimate':productionEstimate();break;case 'production-upload-video':productionUpload('file');break;case 'production-upload-audio':productionUpload('audio');break;case 'production-demo':productionDemo();break;case 'production-auto-scenes':productionAutoScenes();break;case 'production-create-art':productionGenerateSceneImages();break;case 'production-upload-scene':productionUploadScene();break;case 'production-generated':productionGenerated();break;case 'production-transcribe':productionTranscribe();break;case 'production-import-cues':$('#production-cue-file')?.click();break;case 'production-add-cue':{const t=productionCues.at(-1)?.end_seconds||0;const len=Number($('#production-length')?.value)||30;if(t<len-.1){productionCues.push({start_seconds:t,end_seconds:Math.min(t+1.5,len),text:'New caption'});productionPaint()}break;}case 'production-remove-cue':productionCues.splice(Number(btn.dataset.index),1);productionPaint();break;case 'production-seek':{const vid=$('#production-video');const cue=productionCues[Number(btn.dataset.index)];if(vid&&cue)vid.currentTime=(Number($('#production-start')?.value)||0)+cue.start_seconds;break;}case 'production-render':productionRender();break;case 'production-export':productionExport();break;case 'new-channel':openChannel();break;case 'edit-channel':openChannel(id);break;case 'new-content':openProject(null,{channelId:btn.dataset.channel,kind:btn.dataset.kind});break;case 'edit-content':openProject(id);break;case 'preview-project':previewSelectProject(id);navigate('preview');break;case 'preview-demo':previewDemo();break;case 'preview-add':previewAddCue();break;case 'preview-seek-start':{let v=$('#preview-video');if(v&&v.readyState)v.currentTime=previewStart();break;}case 'preview-jump':{let v=$('#preview-video'),c=previewSegments[Number(btn.dataset.index)];if(v?.readyState&&c)v.currentTime=previewStart()+c.start_seconds;break;}case 'preview-remove':previewSegments.splice(Number(btn.dataset.index),1);previewPaintCues();break;case 'preview-apply-text':previewApplyText();break;case 'preview-center-text':moveTextInput('preview',true);break;case 'preview-remove-voice':previewRemoveCommentary();break;case 'preview-save':previewSave();break;case 'preview-export-srt':previewExportSRT();break;case 'preview-export-json':previewExportJSON();break;case 'preview-export-job':{if(previewProject())jobExport(previewProjectId);break;}case 'close-modal':$('#modal').close();break;case 'go-studio':navigate('studio');break;case 'export-job':jobExport(id);break;case 'export-batch':exportRenderBatch();break;case 'restore-recovery':restoreRecovery(Number(btn.dataset.index));break;case 'backup':if(workspaceLoadError){downloadText('dclips-workspace-recovery.json',localStorage.getItem(STORE_KEY)||'');break;}downloadJSON(`shorts-studio-backup-${new Date().toISOString().slice(0,10)}.json`,state);notice('Backup downloaded.');break;case 'import':$('#import-file').click();break;case 'import-scout':$('#scout-file').click();break;case 'import-trends':$('#trend-file').click();break;case 'import-discovery':$('#discovery-file').click();break;case 'export-discovery':if(state.discovery)downloadJSON('youtube-discovery-ranked.json',state.discovery);break;case 'track-discovery':trackDiscovery(id);break;case 'idea-discovery':trackDiscovery(id,true);break;case 'new-trend':openTrend();break;case 'edit-trend':openTrend(id);break;case 'delete-trend':deleteTrend(id);break;case 'idea-trend':ideaTrend(id);break;case 'export-trends':exportTrends();break;case 'export-growth':exportGrowth();break;case 'add-candidate':addCandidate(id,Number(btn.dataset.index));break;case 'demo':doDemo();break;case 'reset':if(confirm('Delete all channels, projects, trend watchlists and manual stats in this browser? This cannot be undone.')){state=initial();save();render();notice('Local workspace reset.')}break;case 'delete-channel':if(confirm('Delete this channel and all its projects?')){state.channels=state.channels.filter(x=>x.id!==id);state.projects=state.projects.filter(x=>x.channelId!==id);$('#modal').close();save();render()}break;case 'delete-project':if(confirm('Delete this project?')){state.projects=state.projects.filter(x=>x.id!==id);$('#modal').close();save();render()}break;case 'script-starter':suggestScript();break;case 'generate-concept':generateConcept();break;case 'ai-load-project':loadAiProject();break;case 'ai-existing':{if($('#modal').open)$('#modal').close();let p=state.projects.find(x=>x.id===id);aiPrefill=p?{topic:p.title,angle:(p.notes||'').slice(0,600),mode:p.kind,channelId:p.channelId,projectId:p.id}:null;navigate('ai');break;}case 'ai-build-prompt':buildAiPrompt();break;case 'ai-copy-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)copyText(t);break;}case 'ai-download-prompt':{const t=aiInput('ai-prompt')||buildAiPrompt();if(t)downloadText('chatgpt-shorts-prompt.txt',t);break;}case 'ai-preview':previewAiReply();break;case 'ai-save-draft':saveAiDraft();break;case 'ai-import-file':$('#ai-file').click();break;case 'save-concept':saveConcept(Number(btn.dataset.index));break;case 'copy-caption':{let p=state.projects.find(x=>x.id===id);if(p)copyText([p.ytTitle||p.title,p.description].filter(Boolean).join('\n\n'));break;}}
 }
 // Drag caption text directly on the video. Save coordinates with each project's final render job.
 document.addEventListener('pointerdown',ev=>{
@@ -1990,6 +2128,7 @@ document.addEventListener('pointercancel',ev=>{if(captionDragging?.pointerId===e
 document.addEventListener('click',handleClick);
 document.addEventListener('submit',ev=>{if(ev.target.id==='live-add-form'){ev.preventDefault();liveAdd(ev.target);return}if(ev.target.id==='editor-form'){ev.preventDefault();submitEditor(ev.target)}if(ev.target.id==='radar-settings'){ev.preventDefault();let n=Number(new FormData(ev.target).get('threshold'));if(Number.isSafeInteger(n)&&n>=1&&n<=100000000000){state.viralThreshold=n;save();render();notice('View threshold updated.')}else notice('Enter a valid views threshold.');}});
 document.addEventListener('input',ev=>{
+ if(ev.target.id?.startsWith('production-')||ev.target.dataset.productionCue)productionEditRevision++;
  if(ev.target.id==='series-adjust-count'){
   const n=Number(ev.target.value),seconds=$('#series-adjust-seconds'),total=Number(ev.target.dataset.storySeconds);
   if(seconds&&Number.isInteger(n)&&n>=1&&n<=60&&total>0)seconds.value=String(Math.max(15,Math.ceil(total/n)));
@@ -2001,7 +2140,9 @@ document.addEventListener('input',ev=>{
  if(ev.target.id==='studio-search')applyStudioFilters();
  if(['preview-caption-x','preview-caption-y'].includes(ev.target.id))moveTextInput('preview');
  if(['production-caption-x','production-caption-y'].includes(ev.target.id))moveTextInput('production');if(ev.target.dataset.productionCue){const cue=productionCues[Number(ev.target.dataset.index)];if(cue){const field=ev.target.dataset.productionCue;cue[field]=field==='text'?ev.target.value:Number(ev.target.value);productionUpdateOverlay();}}if(ev.target.dataset.cueField){let s=previewSegments[Number(ev.target.dataset.index)];if(s){let v=ev.target.dataset.cueField;s[v]=v==='text'?ev.target.value:Number(ev.target.value);previewUpdateOverlay();}}});
-document.addEventListener('change',ev=>{if(ev.target.id==='asmr-finished-video'){asmrImportVideo(ev.target.files?.[0]);ev.target.value='';}
+document.addEventListener('change',ev=>{
+ if(ev.target.id?.startsWith('production-')||ev.target.dataset.productionCue)productionEditRevision++;
+ if(ev.target.id==='asmr-finished-video'){asmrImportVideo(ev.target.files?.[0]);ev.target.value='';}
  if(ev.target.id==='quick-story-file'){quickImportFile(ev.target.files?.[0]);ev.target.value='';}
  if(ev.target.id==='production-cloud-images')cloudImagesSelected(ev.target.files);
  if(ev.target.id==='cloud-finished-mp4')cloudReceiveVideo(ev.target.files?.[0]);
@@ -2031,4 +2172,6 @@ document.addEventListener('timeupdate',ev=>{if(ev.target.id==='production-video'
 $('#mobile-menu').addEventListener('click',()=>$('.sidebar').classList.toggle('show'));
 window.addEventListener('hashchange',()=>{let next=location.hash.slice(1);if(next in views && next!==page){page=next;render()}});
 render();
+if(workspaceLoadError)notice(workspaceLoadError);
 })();
+

@@ -1,6 +1,7 @@
 name: Publish Shorts Studio app release
 on:
   push:
+    branches: [main]
     paths:
       - VERSION.json
   workflow_dispatch:
@@ -12,7 +13,11 @@ on:
 permissions:
   contents: write
 jobs:
+  validate:
+    uses: ./.github/workflows/regression.yml
   publish:
+    needs: validate
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -55,3 +60,4 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "Shorts Studio $RELEASE_TAG" \
             --notes "Code-only app update. Does not contain footage, user data or credentials."
+

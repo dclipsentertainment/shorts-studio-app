@@ -16,19 +16,21 @@
  });
  const wordCount=s=>(String(s||'').match(/[\p{L}\p{N}]+(?:['’\-][\p{L}\p{N}]+)*/gu)||[]).length;
  function chunks(script){
-  const paragraphs=String(script||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
-  const out=[];
-  for(const para of paragraphs){
-   // Never split a sentence just to meet a duration. Very long sentences
-   // stay intact and produce an explicit editorial warning instead.
-   // A full stop inside a decimal is not a sentence boundary.
-   const sentences=para.match(/.+?(?:[.!?]+(?:["'”’])?(?=\s|$)|$)/g)||[para];
-   for(const sentence of sentences){
-    const text=sentence.trim();if(text)out.push({text,words:wordCount(text),
-     complete:/[.!?]+(?:["'”’])?$/.test(text)});
-   }
+  const text=String(script||'').replace(/\s+/g,' ').trim();
+  if(!text)return [];
+  const raw=typeof Intl!=='undefined'&&Intl.Segmenter?
+   Array.from(new Intl.Segmenter('en',{granularity:'sentence'}).segment(text),x=>x.segment.trim()):
+   (text.match(/.+?(?:[.!?]+["'”’ )\]]*(?=\s|$)|$)/g)||[text]).map(x=>x.trim());
+  const abbreviation=/(?:\b(?:Mr|Mrs|Ms|Dr|Prof|St|Sr|Jr|vs|e\.g|i\.e)|\b[A-Z])\.$/i;
+  const complete=s=>/[.!?]+["'”’)\]]*$/.test(s);
+  const joined=[];
+  for(const sentence of raw){
+   if(!sentence)continue;
+   const previous=joined.at(-1);
+   if(previous&&(!complete(previous)||abbreviation.test(previous)))joined[joined.length-1]+=' '+sentence;
+   else joined.push(sentence);
   }
-  return out;
+  return joined.map(text=>({text,words:wordCount(text),complete:complete(text)&&!abbreviation.test(text)}));
  }
  function splitParts(units,count){
   if(count<=1)return [{text:units.map(x=>x.text).join(' ').trim(),words:units.reduce((a,x)=>a+x.words,0)}];
@@ -111,3 +113,4 @@
  }
  return {PROFILES,plan,wordCount};
 });
+

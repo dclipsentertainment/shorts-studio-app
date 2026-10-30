@@ -1,0 +1,39 @@
+name: DClips complete regression checks
+on:
+  push:
+    branches: [main, 'fix/**']
+  pull_request:
+  workflow_dispatch:
+  workflow_call:
+permissions:
+  contents: read
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install test dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg espeak-ng fonts-dejavu-core
+          python -m pip install 'Pillow>=10,<13' 'numpy>=1.26,<3'
+      - name: Run every offline regression and integration entry point
+        run: |
+          set -euo pipefail
+          python -m compileall -q scripts
+          for test in scripts/test_*.js; do node "$test"; done
+          for test in scripts/test_*.py; do python "$test"; done
+          bash scripts/build_cloudflare_pages.sh
+          python scripts/make_app_release.py --out /tmp/verified-app.zip
+      - name: Browser integration checks
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+          node scripts/browser_regressions.cjs

@@ -6,6 +6,7 @@ requires OPENAI_API_KEY on the LOCAL server, and never stores credentials.
 """
 from __future__ import annotations
 import base64
+import hashlib
 import json
 import math
 import os
@@ -36,8 +37,8 @@ def sentences(script):
     script=str(script or '').strip()
     if not script or len(script)>10000:
         raise ValueError('Provide a narration script up to 10,000 characters.')
-    chunks=re.split(r'(?<=[.!?])\s+|\n+',script)
-    return [s.strip() for s in chunks if s.strip()]
+    from story_text import sentence_units
+    return sentence_units(script)
 
 
 def plan_scenes(title,script,spoken_seconds,max_scenes=6):
@@ -171,6 +172,10 @@ def generate_scene_images(payload, *, api_key=None, transport=None, media_dir=No
     destdir.mkdir(parents=True,exist_ok=True)
     url='https://api.openai.com/v1/images/generations'
     output=[]
+    cache_path=destdir/'.generation-cache.json'
+    try:cache=json.loads(cache_path.read_text())
+    except (OSError,ValueError):cache={}
+    if not isinstance(cache,dict):cache={}
     for i,row in enumerate(request['scenes']):
         if row.get('image_path'):
             # Reuse user-supplied images, do not incur another paid generation.
@@ -179,6 +184,11 @@ def generate_scene_images(payload, *, api_key=None, transport=None, media_dir=No
         prompt=scene_prompt(request,row,i)
         body=json.dumps({'model':request['model'],'prompt':prompt,
                          'size':'1024x1536','quality':'medium','n':1}).encode('utf-8')
+        key=hashlib.sha256(body).hexdigest()
+        cached=cache.get(key)
+        if isinstance(cached,str) and re.fullmatch(r'[0-9a-f]{32}\.png',cached) and (destdir/cached).is_file():
+            output.append({'scene':i+1,'image_path':'user-data/media/'+cached,'reused':False,'cached':True})
+            continue
         http=Request(url,data=body,headers={'Authorization':'Bearer '+token,
                     'Content-Type':'application/json'},method='POST')
         try:
@@ -198,5 +208,10 @@ def generate_scene_images(payload, *, api_key=None, transport=None, media_dir=No
             raise ValueError(f'Image generation failed at scene {i+1}: '+str(e)[:180]) from None
         name=uuid.uuid4().hex+'.png'
         (destdir/name).write_bytes(image)
+        cache[key]=name
+        temporary=cache_path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(cache),encoding='utf-8')
+        temporary.replace(cache_path)
         output.append({'scene':i+1,'image_path':'user-data/media/'+name,'reused':False})
     return output
+

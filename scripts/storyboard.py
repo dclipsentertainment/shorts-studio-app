@@ -255,7 +255,7 @@ def create_story_video(job: dict, runtime: float, folder: Path) -> Path:
              '-loop','1','-framerate','30','-i',str(still),'-t',f'{scene_runtime:.5f}',
              '-vf',vf,'-r','30','-an','-c:v','libx264','-preset','veryfast',
              '-crf','27','-pix_fmt','yuv420p',str(clip)]
-        result=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+        result=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=900)
         if result.returncode:
             raise ValueError('Scene encoding failed: '+result.stderr[-700:])
         files.append(clip)
@@ -277,7 +277,8 @@ def create_story_video(job: dict, runtime: float, folder: Path) -> Path:
     cmd+=['-filter_complex',';'.join(graph),'-map',f'[{acc}]','-t',f'{runtime:.4f}',
           '-r','30','-c:v','libx264','-preset','veryfast','-crf','27',
           '-pix_fmt','yuv420p','-movflags','+faststart',str(result)]
-    process=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
+    process=subprocess.run(cmd,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=900)
     if process.returncode:
         raise ValueError('Storyboard renderer failed: '+process.stderr[-900:])
     return result
+

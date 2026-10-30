@@ -13,7 +13,7 @@
   'OPTIONAL DESCRIPTION: '+(description||'None: invent an interesting original premise from the title.'),
   'Write 250-550 spoken words, or another natural length if justified. Start with a strong hook; end with a complete satisfying sentence. Never cut off a word, thought or sentence.',
   'Choose fiction or factual. For factual stories research credible facts and give genuine working direct HTTPS citations. Do not invent historical facts, URLs or quotes. If no reliable sources, report the issue instead of making things up.',
-  'Create 3-8 chronological visual beats. Each visual beat MUST include a short EXACT narration_quote copied from your narration_script, in the same order. No unrelated random imagery.',
+  'Create 3-7 chronological visual beats (plus one separate cover: maximum 8 images total). Each visual beat MUST include a short EXACT narration_quote copied from your narration_script, in the same order. No unrelated random imagery.',
   'For images keep recurring characters visually consistent across age and story progression. The style is vertical 9:16, no text, no logos, leave lower third clear for captions.',
   'Return ONLY one valid JSON object. No Markdown fences. Use exactly these fields:',
   '{',
@@ -41,7 +41,7 @@
   if(!/[.!?](?:["'”’])?$/.test(script))throw Error('Story must end on a complete sentence.');
   if(/\[(HOOK|MAIN|END|RESEARCH|PAYOFF|EXAMPLE)\]/i.test(script))throw Error('Replace outline placeholders in the narration.');
   if(type!=='fiction'&&type!=='factual')throw Error('Story type must be fiction or factual.');
-  if(!Array.isArray(d.scenes)||d.scenes.length<2||d.scenes.length>8)throw Error('Provide 2–8 matching visual scenes.');
+  if(!Array.isArray(d.scenes)||d.scenes.length<2||d.scenes.length>7)throw Error('Provide 2–7 matching story scenes plus one cover (8 images maximum).');
   const normalized=script.replace(/\s+/g,' ').toLowerCase();let last=-1;
   const scenes=d.scenes.map((scene,i)=>{
    if(!scene||typeof scene!=='object')throw Error('Scene '+(i+1)+' is invalid.');
@@ -77,7 +77,7 @@
   return [{headline:plain(title,95)||'Story cover',image_path:'',start_seconds:null},...beats.filter(x=>x.start_seconds<=spoken-1.2)];
  }
  function imagePrompt(pack){
-  if(!pack||!Array.isArray(pack.scenes)||!pack.scenes.length)throw Error('Review a generated story first.');
+  if(!pack||!Array.isArray(pack.scenes)||!pack.scenes.length||pack.scenes.length>7)throw Error('Review a generated story first.');
   return [
    'Create '+(pack.scenes.length+1)+' SEPARATE ORIGINAL vertical 9:16 story illustrations. Do not make a collage or contact sheet.',
    'STORY: '+pack.title,
