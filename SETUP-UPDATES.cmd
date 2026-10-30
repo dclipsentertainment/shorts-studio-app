@@ -1,5 +1,6 @@
 @echo off
 setlocal
-powershell.exe -NoLogo -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\configure-updates.ps1"
+echo DClips now checks its verified GitHub releases automatically.
+echo No separate update setup is required.
 echo.
-pause
+call "%~dp0CHECK-FOR-UPDATES.cmd"
