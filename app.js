@@ -1302,6 +1302,7 @@ function productionApprove(){
  let p;try{p=productionDraftSave()}catch(e){notice('Save your changes before approval: '+e.message);return}
  const last=latestRender(p);
  if(!p||!last){notice('Render the current version of your video before approving.');return}
+ if(!productionBackend.local){notice('The local renderer must be open to review the actual MP4.');return}
  if(last.quality?.status==='fail'||!last.quality){notice('A passing technical quality report is required.');return}
  const issues=renderBlockers(p);
  if(issues.length){notice('Review blocked: '+issues[0]);return}
