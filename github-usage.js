@@ -58,7 +58,8 @@
   function render() {
     const input = data || savedReport;
     const live = Boolean(data);
-    const estimated = input && Number.isFinite(Number(input.estimatedPrivateMinutes))
+    const hasPrivate = Boolean(input && Array.isArray(input.repositories) && input.repositories.some(function (r) { return r.private && !r.unavailable; }));
+    const estimated = hasPrivate && Number.isFinite(Number(input.estimatedPrivateMinutes))
       ? Number(input.estimatedPrivateMinutes) : null;
     const billing = live ? input.billing : null;
     const official = billing && billing.available;
@@ -131,7 +132,7 @@
     let isPartial = false;
     for (let page = 1; page <= 3; page++) {
       const result = await request('/repos/' + OWNER + '/' + repo + '/actions/runs?per_page=100&page=' + page +
-        '&created=' + encodeURIComponent(month + '-01..' + month + '-31'), auth);
+        '&created=' + encodeURIComponent(month + '-01..' + month + '-' + String(new Date(Date.UTC(Number(month.slice(0,4)), Number(month.slice(5,7)), 0)).getUTCDate()).padStart(2, '0')), auth);
       if (Array.isArray(result.workflow_runs)) list.push.apply(list, result.workflow_runs);
       if (result.total_count > 300) isPartial = true;
       if (!result.workflow_runs || result.workflow_runs.length < 100) break;
