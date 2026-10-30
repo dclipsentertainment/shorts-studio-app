@@ -11,7 +11,7 @@ Open **Quick Create** in the sidebar (or **Create story** at the top).
 
 **No paid API is called**, and the computer does not run an image model. This is a small, deliberate manual ChatGPT copy/paste step because a ChatGPT subscription does not give the public DClips website a free image-generation API.
 
-**What is not automatic yet:** The generated story package contains scene descriptions, not actual images or a finished MP4. Illustrations still need to be generated in ChatGPT, saved and transferred to DClips. Fully online cloud render submission/storage is a separate integration. DClips marks every generated project as a draft with rights and factual checks unconfirmed; no platform uploads or posting occur.
+**After draft creation:** Open an episode in **Production flow**, copy its scene-specific ChatGPT image request, and generate the numbered illustrations with ChatGPT. Import them together using **ChatGPT image pack → online video**. DClips prepares one private cloud-render ZIP; manually upload it to your private GitHub production repository to render online. Download the resulting MP4 artifact and open it in DClips for review. No local GPU, Python or FFmpeg required. See **README-CLOUD-RENDER.md**. DClips still requires manual ChatGPT image creation, a GitHub upload and factual/rights approval; it does not automatically publish.
 
 This creator complements, rather than removes, the advanced Story series planner, ChatGPT script desk and Production flow. The advanced editors remain available if you decide to change anything after the first preview. Do not trust generated sources or factual claims without checking them.
 
