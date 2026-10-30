@@ -532,10 +532,14 @@ def render(job_path: Path, out_dir: Path) -> Path:
         tempdir=Path(td)
         procedural=kind=='original' and not source.get('path') and not source.get('url')
         visual_mode=(data.get('visuals') or {}).get('mode','classic')
-        if visual_mode not in ('classic','storyboard'):
+        if visual_mode not in ('classic','storyboard','illustrated'):
             raise JobError('Visual mode must be classic or storyboard.')
-        if kind=='original' and visual_mode=='storyboard' and not procedural:
-            raise JobError('Storyboard mode requires generated background, not a source video.')
+        if kind=='original' and visual_mode in ('storyboard','illustrated') and not procedural:
+            raise JobError('Image story modes require generated background, not a source video.')
+        image_story = kind=='original' and visual_mode=='illustrated'
+        intro_seconds=float((data.get('visuals') or {}).get('intro_seconds',2.0)) if image_story else 0
+        if image_story and (not math.isfinite(intro_seconds) or not 1.2<=intro_seconds<=4):
+            raise JobError('Illustrated story title introduction must last 1.2–4 seconds.')
         if source.get('path'):
             video=path_from_project(source['path'])
         elif source.get('url'):
@@ -570,10 +574,10 @@ def render(job_path: Path, out_dir: Path) -> Path:
             voice=voice_kokoro(script,tempdir/'kokoro-narration.wav',str(narration.get('voice') or 'af_heart'),float(narration.get('speed',0.96)))
         runtime=requested
         if kind=='original' and voice:
-            runtime=min(180,max(requested,duration_of(voice)+0.2))
+            runtime=min(180,max(requested,duration_of(voice)+intro_seconds+0.2))
         if kind=='clip' and source_length:
             runtime=min(runtime,source_length-start)
-        if procedural and visual_mode=='storyboard':
+        if procedural and visual_mode in ('storyboard','illustrated'):
             try:
                 from storyboard import create_story_video
                 video=create_story_video(data,runtime,tempdir/'story-scenes')
@@ -587,9 +591,15 @@ def render(job_path: Path, out_dir: Path) -> Path:
         timed=[]
         if (bool(data.get('captions',True)) or caption_style=='hook') and caption_style!='none':
             timed=data.get('caption_segments') or []
+            subtitle_title='' if image_story else title
             if (mode in ('kokoro','piper') and voice and
                     narration.get('sync_captions', True) and not timed):
-                timed = align_voice_captions(voice, script, runtime)
+                timed = align_voice_captions(voice, script, max(1,runtime-intro_seconds))
+                if image_story:
+                    timed=[{**cue,
+                            'start_seconds':round(cue['start_seconds']+intro_seconds,3),
+                            'end_seconds':round(cue['end_seconds']+intro_seconds,3)}
+                           for cue in timed]
                 print(f'Speech-aligned captions from generated audio: {len(timed)} cues.')
 
             if caption_style=='hook':
@@ -597,14 +607,14 @@ def render(job_path: Path, out_dir: Path) -> Path:
             elif caption_style=='kinetic':
                 if timed:
                     # Validate all timestamp rules before composing kinetic groups.
-                    make_ass_timed(timed,runtime,title,tempdir/'validate.ass','classic')
-                    captions=kinetic_ass_events([(float(c['start_seconds']),float(c['end_seconds']),c['text']) for c in timed],title,ass)
+                    make_ass_timed(timed,runtime,subtitle_title,tempdir/'validate.ass','classic')
+                    captions=kinetic_ass_events([(float(c['start_seconds']),float(c['end_seconds']),c['text']) for c in timed],subtitle_title,ass)
                 else:
-                    captions=make_kinetic(script,runtime,title,ass)
+                    captions=make_kinetic(script,runtime,subtitle_title,ass)
             else:
-                captions=(make_ass_timed(timed,runtime,title,ass,caption_style) if timed
-                          else (make_ass_word_pop(script,runtime,title,ass) if caption_style=='word-pop'
-                                else make_ass(script,runtime,title,ass)))
+                captions=(make_ass_timed(timed,runtime,subtitle_title,ass,caption_style) if timed
+                          else (make_ass_word_pop(script,runtime,subtitle_title,ass) if caption_style=='word-pop'
+                                else make_ass(script,runtime,subtitle_title,ass)))
         else:
             captions=False
         if captions:
@@ -650,7 +660,10 @@ def render(job_path: Path, out_dir: Path) -> Path:
                   '-c:a','aac','-b:a','128k','-ar','48000',
                   '-movflags','+faststart','-shortest']
         if voice or any(s.get('codec_type')=='audio' for s in metadata.get('streams',[])):
-            command+=['-af','loudnorm=I=-16:TP=-1.5:LRA=11,apad' if voice else 'loudnorm=I=-16:TP=-1.5:LRA=11']
+            audio_filter='loudnorm=I=-16:TP=-1.5:LRA=11,apad' if voice else 'loudnorm=I=-16:TP=-1.5:LRA=11'
+            if image_story and voice:
+                audio_filter=f'adelay={round(intro_seconds*1000)}:all=1,'+audio_filter
+            command+=['-af',audio_filter]
         command.append(str(output))
         print(f'Rendering {kind}: {title} ({runtime:.1f}s; {"captions" if captions else "no captions"}; voice={mode})')
         run(command)
