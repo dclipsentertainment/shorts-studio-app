@@ -4,6 +4,8 @@ on:
     paths:
       - index.html
       - app.js
+      - asmr.js
+      - scripts/test_asmr_ui.js
       - cloud-pack.js
       - scripts/test_cloud_pack.js
       - story-series.js
@@ -31,7 +33,7 @@ jobs:
         run: bash scripts/build_cloudflare_pages.sh
       - name: Verify only intended public assets are shipped
         run: |
-          test "$(find dist-cloudflare -maxdepth 1 -type f | wc -l)" -eq 8
+          test "$(find dist-cloudflare -maxdepth 1 -type f | wc -l)" -eq 9
           test ! -e dist-cloudflare/scripts
           test ! -e dist-cloudflare/user-data
           test ! -e dist-cloudflare/reports
