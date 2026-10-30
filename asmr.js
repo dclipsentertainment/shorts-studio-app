@@ -5,10 +5,10 @@
 })(typeof window!=='undefined'?window:null,function(){
  'use strict';
  const profiles={
-  slime:{name:'Slime squishing',visual:'Glowing translucent squishy slime repeatedly compresses, spreads and rebounds.',sound:'Original low wet squish pulses and soft pops.'},
-  bubbles:{name:'Bubble popping',visual:'Blue iridescent bubbles expand and burst into delicate particles.',sound:'Original gentle popping and delicate plink sounds.'},
-  sand:{name:'Kinetic sand slicing',visual:'A pastel textured sand block is sliced in smooth repeated strokes.',sound:'Original crunchy, grainy scraping sounds.'},
-  soap:{name:'Soap shaving',visual:'Soft blue soap is peeled in smooth ribbon-like curls.',sound:'Original delicate slicing and shaving sounds.'}
+  slime:{name:'Slime squishing',visual:'Macro-style glossy translucent gel, micro-bubbles, softer compression and subtle camera push-ins.',sound:'Layered stereo wet squishes and tiny pop details synchronized to each press.'},
+  bubbles:{name:'Bubble popping',visual:'Macro iridescent bubbles with coloured reflections, airy drifting and expanding burst particles.',sound:'Stereo bubble pops and gentle plinks timed to visible bursts.'},
+  sand:{name:'Kinetic sand slicing',visual:'Fine-grained sand material with moving cuts, scattered grains and slow camera motion.',sound:'Fine textured stereo scrapes and small granular clicks following the blade.'},
+  soap:{name:'Soap shaving',visual:'Shiny sculpted soap and smooth carving passes with layered soap curls.',sound:'Delicate layered shaving and crisp cutting textures, matched to the movement.'}
  };
  function profileFor(title,description=''){
   const text=(title+' '+description).toLowerCase();
@@ -18,6 +18,19 @@
   if(/slime|squish|squeeze|squash|jelly|gel|goo|soft.crush/.test(text))return 'slime';
   return 'slime'; // Gentle default for vague "satisfying" titles.
  }
+ function colorway(title,description=''){
+  const text=(title+' '+description).toLowerCase();
+  if(/purple|violet|lavender|lilac|blueberry|indigo/.test(text))return 'lavender';
+  if(/pink|rose|red|strawberry|cherry|peach/.test(text))return 'rose';
+  if(/gold|yellow|orange|caramel|honey|amber|brown|sand/.test(text))return 'amber';
+  return 'mint';
+ }
+ function soundIntensity(title,description=''){
+  const text=(title+' '+description).toLowerCase();
+  if(/soft|gentle|calm|quiet|sleep|relax|peace|whisper/.test(text))return 'gentle';
+  if(/crunch|crispy|crisp|snapp|strong|hard|loud|sharp/.test(text))return 'crisp';
+  return 'balanced';
+ }
  function prepare(title,description=''){
   if(typeof title!=='string'||typeof description!=='string')throw Error('Title and description must be text.');
   title=title.trim();description=description.trim();
@@ -25,14 +38,15 @@
   if(description.length>600)throw Error('Optional description must be under 600 characters.');
   const profile=profileFor(title,description);
   return {
-   version:1,kind:'asmr',title,description,profile,
-   duration:16,visual_style:'stylised-animated-original',
-   audio_style:'original-synthesised',review_required:true
+   version:2,kind:'asmr',title,description,profile,
+   duration:16,visual_style:'cinematic-procedural-v2',
+   audio_style:'layered-foley-v2',colorway:colorway(title,description),
+   sound_intensity:soundIntensity(title,description),review_required:true
   };
  }
  function describe(job){
   if(!job||!Object.prototype.hasOwnProperty.call(profiles,job.profile))throw Error('Unknown ASMR style.');
-  return {...profiles[job.profile],duration:16,profile:job.profile};
+  return {...profiles[job.profile],duration:16,profile:job.profile,colorway:job.colorway||'mint',soundIntensity:job.sound_intensity||'balanced'};
  }
  function filename(now=new Date(),suffix){
   if(!(now instanceof Date)||!Number.isFinite(now.getTime()))throw Error('Invalid time.');
@@ -41,5 +55,5 @@
   if(!/^[a-z0-9]{6}$/.test(random))throw Error('Invalid export identifier.');
   return 'cloud-asmr-'+stamp+'-'+random+'.json';
  }
- return {prepare,describe,profileFor,filename,profiles};
+ return {prepare,describe,profileFor,colorway,soundIntensity,filename,profiles};
 });
