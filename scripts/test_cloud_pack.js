@@ -29,6 +29,32 @@ async function run(){
  assert.throws(()=>pack.detect(Uint8Array.from([1,2,3])),/not a genuine/);
  await assert.rejects(()=>pack.packageJob({...job,rights_confirmed:false},mapped.slots),/rights-confirmed/);
  await assert.rejects(()=>pack.packageJob(job,[file('02-wrong.png',jpg),files[0]]),/extension does not match/);
+
+ // A ChatGPT-generated image archive can now be selected without extracting it.
+ const zipFile=data=>new File([data],'chatgpt-images.zip',{type:'application/zip'});
+ const artwork=pack.zip([{name:'01-cover.png',data:png},{name:'images/02-scene.jpg',data:jpg}]);
+ const decoded=await pack.imagesFromArchive(zipFile(artwork));
+ assert.deepEqual(decoded.map(f=>f.name),['01-cover.png','02-scene.jpg']);
+ assert.deepEqual(pack.assign(decoded,2).missing,[]);
+ // Python zipfile's standard DEFLATE format also works; no extra JS ZIP library.
+ const {deflateRawSync}=require('node:zlib');
+ const first=pack.zip([{name:'01-cover.png',data:png}]);
+ const view=new DataView(first.buffer,first.byteOffset,first.byteLength);
+ const u16=(b,i)=>b[i]|(b[i+1]<<8),wr16=(b,i,n)=>{b[i]=n&255;b[i+1]=(n>>>8)&255;};
+ const wr32=(b,i,n)=>{wr16(b,i,n&65535);wr16(b,i+2,(n>>>16)&65535);};
+ const cdpos=view.getUint32(first.length-6,true),cdlen=view.getUint32(first.length-10,true);
+ const lhlen=30+u16(first,26),compressed=deflateRawSync(Buffer.from(png));
+ const header=Uint8Array.from(first.slice(0,lhlen)),center=Uint8Array.from(first.slice(cdpos,cdpos+cdlen)),tail=Uint8Array.from(first.slice(-22));
+ wr16(header,8,8);wr32(header,18,compressed.length);
+ wr16(center,10,8);wr32(center,20,compressed.length);
+ wr32(tail,16,header.length+compressed.length);
+ const deflated=Uint8Array.from(Buffer.concat([header,compressed,center,tail]));
+ assert.deepEqual((await pack.imagesFromArchive(zipFile(deflated))).map(f=>f.name),['01-cover.png']);
+ await assert.rejects(()=>pack.imagesFromArchive(zipFile(pack.zip([{name:'../secret.png',data:png}]))),/unsafe filenames/);
+ await assert.rejects(()=>pack.imagesFromArchive(zipFile(pack.zip([{name:'story.json',data:png}]))),/only contain PNG/);
+ const tampered=Uint8Array.from(artwork);tampered[40]^=1;
+ await assert.rejects(()=>pack.imagesFromArchive(zipFile(tampered)),/integrity|invalid|format/i);
+
  const app=fs.readFileSync('app.js','utf8'),html=fs.readFileSync('index.html','utf8');
  assert(app.includes('data-action="cloud-export"')&&app.includes('data-action="cloud-clear"'));
  assert(html.includes('cloud-pack.js'));
