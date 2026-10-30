@@ -1,28 +1,34 @@
-# Shorts Studio — DClips Entertainment
+# DClips Studio — multi-platform creator workspace
 
-Public application repository for **Shorts Studio v0.14.2**.
+**Current version: v0.14.3 | 30 October 2026**
 
-## Status — 30 October 2026
+DClips is a four-platform creator workspace for **YouTube Shorts, Instagram Reels, TikTok and Facebook Reels**. The same original 9:16 video can be prepared for each network, with separate account labels, manual performance metrics and earnings tracked by platform.
 
-- **Imported:** existing v0.14 dashboard, scripts, styles, and documentation.
-- **Verified:** the GitHub importer completed and ran application syntax and packaging checks.
-- **Released:** [v0.14.2](https://github.com/dclipsentertainment/shorts-studio-app/releases/tag/v0.14.2), with the code-only `shorts-studio-app.zip` asset.
-- **New:** One-download Windows launcher checks verified GitHub releases and installs application updates automatically, with no setup or Git required. [Windows update instructions](README-RELEASES.md).
-- **New:** GitHub usage monitor with private usage reports, available as its own page. [Usage monitoring](README-GITHUB-USAGE.md).
-- **Status:** The private production repo contains verified YouTube OAuth and has completed an authorised private test upload. Public posting remains opt-in.
+## Use as a website — Cloudflare Pages (Free)
 
-## Download or run
+The source code is already prepared for Cloudflare Pages with a restricted public build. See [Cloudflare setup](README-CLOUDFLARE.md).
 
-Download the ZIP from [Releases](https://github.com/dclipsentertainment/shorts-studio-app/releases) and follow `README-FIRST.md`. Windows launch scripts (`OPEN-DASHBOARD.cmd`, `OPEN-PRODUCTION-STUDIO.cmd`) are included in the app package.
+**One-time setup:** sign into Cloudflare -> Workers & Pages -> Create application -> Pages -> Connect to Git -> select the public `dclipsentertainment/shorts-studio-app` repository only. Use `bash scripts/build_cloudflare_pages.sh` as the build command and `dist-cloudflare` as the output directory.
 
-To publish a later update, use **Actions → Publish Shorts Studio app release**, specifying a tag matching `VERSION.json`. Do not reuse existing release tags.
+**Important:** The Cloudflare deployment still needs account authorisation. A live hosted website is not yet confirmed. Cloudflare will show the real `*.pages.dev` URL after the first successful deployment. The site is public by default, and browser data does not yet sync between computers.
 
-## Repository roles
+## GitHub repositories
 
-This public repository holds application code, non-sensitive build configuration and documentation. Production data, sample assets, and rendering workflows belong in the private repository.
+- **Public application:** https://github.com/dclipsentertainment/shorts-studio-app
+- **Private production engine:** https://github.com/dclipsentertainment/shorts-studio-production
 
-Never upload passwords, OAuth credentials, API keys, private footage or user data here.
+The private repo includes cloud rendering, expressive AI voice synthesis, original storyboards, technical quality checks, and manually approved **private** YouTube uploads. TikTok, Instagram and Facebook publishing integrations are planned, not currently connected. Automatic publication is intentionally disabled.
 
-## Import history
+## Windows fallback
 
-The v0.14 source was imported using the checksum-verified `import-app.yml` workflow. The import ZIP was removed from the main branch by the successful workflow. The release workflow was installed separately because the workflow job token cannot create additional workflow files.
+If you prefer the local version, download the release ZIP from https://github.com/dclipsentertainment/shorts-studio-app/releases/latest, extract once, and open `OPEN-DASHBOARD.cmd`. The launcher checks for new releases and updates itself without Git or administrator access.
+
+## Security and monetisation
+
+We **never publish private footage, credentials or jobs** to Cloudflare Pages. Its static build contains only HTML, CSS, client-side JavaScript and response headers. GitHub account access and future upload integrations must be authorised securely.
+
+We track platform-specific income independently because Ireland's monetisation eligibility differs across YouTube, Facebook, Instagram and TikTok. Views are not automatically equivalent to paid views; read [the Cloudflare guide](README-CLOUDFLARE.md) for restrictions and the [usage guide](README-GITHUB-USAGE.md) for infrastructure cost estimates.
+
+## Release verification
+
+GitHub Actions checks JavaScript syntax, the public asset allowlist, the dashboard controls and release ZIP packaging. The local Windows updater was tested against a real GitHub release.
