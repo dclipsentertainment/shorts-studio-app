@@ -138,6 +138,11 @@ def begin_task(job, kind):
                 elif quality['warnings']:
                     value['warning'] = '; '.join(quality['warnings'][:3])
 
+            elif kind=='images':
+                from scene_automation import generate_scene_images
+                with LOCK: TASKS[task_id]['message']='Generating illustrated scenes with the configured API (billable)…'
+                pictures=generate_scene_images(job)
+                value={'status':'done','message':f'{len(pictures)} scene images prepared; review every picture before rendering.','images':pictures}
             else:
                 from transcribe import transcribe
                 path=media_path(job['media'])
@@ -171,7 +176,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._safe_host(): return self.response(403,{'error':'Invalid local host'})
         path=urlparse(self.path).path
         if path=='/api/status':
-            return self.response(200,{'local':True,'ffmpeg':bool(shutil.which('ffmpeg') and shutil.which('ffprobe')),'transcriber':__import__('importlib').util.find_spec('faster_whisper') is not None,'face_tracking':__import__('importlib').util.find_spec('cv2') is not None})
+            return self.response(200,{'local':True,'ffmpeg':bool(shutil.which('ffmpeg') and shutil.which('ffprobe')),'transcriber':__import__('importlib').util.find_spec('faster_whisper') is not None,'face_tracking':__import__('importlib').util.find_spec('cv2') is not None,'image_generation_available':bool(os.environ.get('OPENAI_API_KEY'))})
         if path.startswith('/api/task/'):
             task=path.rsplit('/',1)[-1]
             with LOCK: result=dict(TASKS.get(task) or {})
@@ -224,7 +229,7 @@ class Handler(BaseHTTPRequestHandler):
         if not self._safe_host() or not self._safe_origin() or self.headers.get('X-Shorts-Studio')!='local-0.12':
             return self.response(403,{'error':'Only local Shorts Studio can use this endpoint.'})
         path=urlparse(self.path).path
-        if path not in ('/api/upload','/api/render','/api/transcribe'):
+        if path not in ('/api/upload','/api/render','/api/transcribe','/api/scene-plan','/api/scene-images'):
             return self.response(404,{'error':'Unknown action'})
         try: length=int(self.headers.get('Content-Length','0'))
         except ValueError: length=0
@@ -259,6 +264,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.response(415,{'error':'Send JSON content.'})
         try:
             obj=json.loads(self.rfile.read(length))
+            if path=='/api/scene-plan':
+                from scene_automation import plan_scenes
+                return self.response(200,plan_scenes(obj.get('title'),obj.get('script'),obj.get('spoken_seconds'),obj.get('max_scenes',6)))
+            if path=='/api/scene-images':
+                from scene_automation import validate_image_request
+                validate_image_request(obj)
+                if not os.environ.get('OPENAI_API_KEY'):
+                    raise ValueError('Image generation requires OPENAI_API_KEY configured on this local computer. It may incur separate API charges.')
+                return self.response(202,{'task_id':begin_task(obj,'images')})
             if path=='/api/render':
                 validate_job(obj)
                 if not shutil.which('ffmpeg') or not shutil.which('ffprobe'):raise ValueError('FFmpeg and ffprobe must be on PATH.')
