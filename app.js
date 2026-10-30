@@ -27,6 +27,21 @@ let quickBrief = null;
 let quickPack = null;
 let quickPrompt = '';
 let quickJson = '';
+
+try{
+ const previous=JSON.parse(localStorage.getItem('dclips_quick_progress_v1')||'null');
+ if(previous&&typeof previous.title==='string'&&previous.title.length>=3&&previous.title.length<=150&&typeof previous.description==='string'&&previous.description.length<=600&&typeof previous.response==='string'&&previous.response.length<=115000){
+  quickBrief={title:previous.title,description:previous.description};
+  quickPrompt=window.DClipsQuick?.prompt(quickBrief.title,quickBrief.description)||'';
+  quickJson=previous.response;
+ }
+}catch(_){/* Damaged temporary progress can be safely discarded. */}
+
+function quickRemember(){
+ try{localStorage.setItem('dclips_quick_progress_v1',JSON.stringify({
+  title:quickBrief?.title||'',description:quickBrief?.description||'',response:quickJson
+ }));}catch(_){/* Temporary progress is best-effort. */}
+}
 let seriesDraft = null;
 let seriesPreview = null;
 let watchedSeriesRenderKey = ''; // Unlocked after completed playback of the rendered episode.
@@ -158,8 +173,9 @@ function quickPrepare(){
   const generated=window.DClipsQuick.prompt(title,description);
   quickBrief={title,description};
   quickPrompt=generated;quickPack=null;quickJson='';
-  render();
+  quickRemember();render();
   copyText(generated);
+  if(typeof window.open==='function')window.open('https://chatgpt.com/','_blank','noopener,noreferrer');
   notice('Your ChatGPT request is ready. Open ChatGPT and paste it; then return with the JSON story.');
  }catch(e){notice(e.message);}
 }
@@ -167,6 +183,7 @@ function quickReview(){
  try{
   quickJson=$('#quick-json')?.value||'';
   quickPack=window.DClipsQuick.parse(quickJson);
+  quickRemember();
   if(!quickBrief)throw Error('Prepare a title first.');
   const plan=window.DClipsSeries.plan({title:quickPack.title,script:quickPack.script,wpm:145,platforms:['YT','IG','TT','FB']});
   const count=plan.platforms.reduce((n,x)=>n+x.partCount,0);
@@ -210,6 +227,7 @@ function quickCreate(){
   state.seriesPlans.push(record);
   if(!save()){state=JSON.parse(before);throw Error('Could not save projects. Export a backup.');}
   quickPack=null;quickPrompt='';quickJson='';quickBrief=null;
+  try{localStorage.removeItem('dclips_quick_progress_v1')}catch(_){}
   navigate('studio');
   notice('Created '+projects.length+' story drafts, including scene plans. Add ChatGPT illustrations and review before rendering.');
  }catch(e){notice(e.message);}
