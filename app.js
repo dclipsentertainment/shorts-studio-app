@@ -107,6 +107,47 @@ function channelsPage(){return `${heading('BRANDS & ACCOUNTS','Your channels','M
  <div class="notice" style="margin-bottom:21px">Names and @handles are planning information only. Entering a handle does <strong>not</strong> connect an account or enable publishing. OAuth integration comes later.</div>
  ${state.channels.length?`<div class="channel-grid">${state.channels.map(channelCard).join('')}</div>`:empty('◎','No channel groups yet','Create one brand for each type of content.','Create a channel','new-channel')}
  <h2 class="section-title">Recommended structure</h2><div class="panel"><p class="secondary-note">Use one content brand across YouTube Shorts, Instagram Reels, TikTok and Facebook Reels. Keep each platform handle and performance figure separate; publishing rights and monetisation eligibility vary by platform.</p></div>`}
+function liveMonitorPage(){
+ const watchers=state.streamers||[];
+ const url=w=>(w.platform==='twitch'?'https://www.twitch.tv/':w.platform==='kick'?'https://kick.com/':'https://www.youtube.com/@')+encodeURIComponent(w.handle);
+ return `${heading('STREAM CLIP DISCOVERY','Live stream monitor','Track gaming and IRL streamer accounts, permissions and clip candidates.')}
+ <div class="notice warn" style="margin-bottom:18px"><strong>Monitoring is not connected yet.</strong> The watchlist below works offline, but automatic go-live notifications and continuous stream analysis require an authorised streaming-platform connection and backend. We do not record or scrape anyone’s livestream here.</div>
+ <div class="grid-main"><section class="panel"><h2>Add streamer to watchlist</h2>
+ <form id="live-add-form" class="form-grid">
+ <div class="form-field"><label for="live-platform">Platform</label><select class="field" name="platform" id="live-platform"><option value="twitch">Twitch</option><option value="kick">Kick</option><option value="youtube">YouTube Live</option></select></div>
+ <div class="form-field"><label for="live-handle">Username</label><input class="field" id="live-handle" name="handle" maxlength="45" required placeholder="Streamer's username"></div>
+ <div class="form-field"><label for="live-rights">Reuse permission</label><select class="field" id="live-rights" name="rights"><option value="unknown">Not confirmed — discovery only</option><option value="owned">My own stream</option><option value="written">Written permission</option><option value="licensed">Suitable licence</option></select></div>
+ <div class="form-field"><label for="live-rights-notes">Rights / creative notes</label><input class="field" name="notes" maxlength="200" placeholder="Permission and restrictions"></div>
+ <div class="span2"><button class="button button-primary" type="submit">＋ Save streamer</button></div>
+ </form></section>
+ <section class="panel"><h2>How clip review will work</h2>
+ <div class="step"><div class="step-number">1</div><div><strong>Detect stream start</strong><p class="secondary-note">Connect official platform go-live events later; show notifications when the backend is authorised.</p></div></div>
+ <div class="step"><div class="step-number">2</div><div><strong>Review interesting moments</strong><p class="secondary-note">Rank highlight candidates from permission-cleared streams/VODs using speech, scene changes and audience reactions.</p></div></div>
+ <div class="step"><div class="step-number">3</div><div><strong>Choose creative treatment</strong><p class="secondary-note">Keep original audio, add a brief headline or accurate subtitles, or choose a voice-over if it adds something meaningful.</p></div></div>
+ <p class="footnote">No clip is automatically published. Captions, crops and music do not replace permission or guarantee monetisation.</p></section></div>
+ <h2 class="section-title">Watchlist · ${watchers.length}</h2>
+ ${watchers.length?`<div class="channel-grid">${watchers.map(w=>`<article class="channel-card"><div class="channel-top"><strong>${esc(w.platform)}</strong><span class="tiny-muted">Status not connected</span></div><h3 class="channel-name">${esc(w.handle)}</h3><p class="secondary-note">${w.rights==='unknown'?'Rights to reuse not verified':w.rights==='owned'?'Own footage':w.rights==='written'?'Written permission recorded':'Licence recorded'}.</p><p class="secondary-note">${esc(w.notes||'')}</p><div class="card-actions"><a class="button tiny" href="${url(w)}" target="_blank" rel="noopener noreferrer">Open stream ↗</a><button class="button tiny button-ghost" type="button" data-action="live-plan" data-id="${esc(w.id)}">Plan a clip</button><button class="button tiny button-danger" type="button" data-action="live-delete" data-id="${esc(w.id)}">Remove</button></div></article>`).join('')}</div>`:empty('◉','No streamers added','Add a creator to your watchlist. Their live status is not automatically checked yet.','','')}
+ `;
+}
+function liveAdd(form){
+ const fd=new FormData(form),platform=String(fd.get('platform')||'');
+ const handle=String(fd.get('handle')||'').trim().replace(/^@/,'');
+ const rights=String(fd.get('rights')||'unknown'),notes=String(fd.get('notes')||'').trim().slice(0,200);
+ if(!['twitch','kick','youtube'].includes(platform)||!/^[A-Za-z0-9_-]{2,45}$/.test(handle)||!['unknown','owned','written','licensed'].includes(rights)){notice('Enter a valid streamer username and permission status.');return}
+ if(state.streamers.some(w=>w.platform===platform&&w.handle.toLowerCase()===handle.toLowerCase())){notice('Already tracked.');return}
+ if(state.streamers.length>=60){notice('Watchlist is full.');return}
+ state.streamers.push({id:uid(),platform,handle,rights,notes});save();render();notice('Streamer saved. Automated monitoring requires a platform connection.');
+}
+function livePlan(id){
+ const w=state.streamers.find(x=>x.id===id);if(!w)return;
+ if(!state.channels.length){navigate('channels');notice('Create a brand before planning a clip.');return}
+ const now=new Date().toISOString();
+ state.projects.push({id:uid(),title:w.handle+' · stream moment',kind:'clip',channelId:state.channels[0].id,status:'idea',
+ duration:35,start:0,sourcePath:'',sourceUrl:'',script:'',captionStyle:'hook',hookText:'What happens next?',
+ voiceMode:'none',rights:false,notes:'Source streamer: '+w.platform+'/'+w.handle+'. Permissions: '+w.rights+'. '+w.notes+
+ '. Use authorised source footage only. Confirm music/streamer rights and human review before exporting.',createdAt:now,updatedAt:now});
+ save();navigate('studio');notice('Review-only clip project created. Source and permissions must be confirmed.');
+}
 function studioPage(){const list=state.projects.filter(p=>filter==='all'||p.kind===filter);
  return `${heading('CREATIVE WORKSPACE','Content studio','Build original narration videos or plan authorised clips.',`<button class="button button-primary" data-action="new-content">＋ Create project</button>`)}
  <div class="studio-layout"><div class="panel"><div class="panel-head"><h2>Two production paths</h2></div><div class="setup-list"><div class="setup-item"><div class="check">✂</div><div><strong>Clip an existing video</strong><p>Use footage you own or have permission to edit. Pick a start time, duration and captions.</p><button class="button tiny" data-action="new-content" data-kind="clip">Make a clip →</button></div></div><div class="setup-item"><div class="check">✧</div><div><strong>Create a narrated video</strong><p>Use a script plus background footage. Starter renderer includes optional basic free narration.</p><button class="button tiny" data-action="new-content" data-kind="original">Make an original →</button></div></div></div></div><div class="panel"><div class="panel-head"><h2>Starter production capabilities</h2></div><div class="step"><div class="step-number">✓</div><div><div class="step-title">9:16 vertical MP4 output</div><div class="step-text">720 × 1280, ready to preview as a Short or Reel.</div></div></div><div class="step"><div class="step-number">✓</div><div><div class="step-title">Text overlays and caption timing</div><div class="step-text">Creates captions from your supplied script, not automatic transcription.</div></div></div><div class="step"><div class="step-number">✓</div><div><div class="step-title">Free basic narration</div><div class="step-text">FFmpeg's Flite voice if supported by the rendering machine. More natural AI voices come later.</div></div></div><div class="notice">Use Clip scout to import FFmpeg-generated candidate moments. Use Preview & subtitles for video trimming and imported timed captions. Optional speech transcription runs through scripts/transcribe.py.</div></div></div>
