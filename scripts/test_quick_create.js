@@ -27,6 +27,8 @@ const response=JSON.stringify({
 const p=quick.parse(response);
 assert(p.words>=60);
 assert.equal(p.scenes.length,3);
+assert(quick.imagePrompt(p).includes('01-cover')&&quick.imagePrompt(p).includes('04-scene'));
+
 assert(/lower third/i.test(quick.prompt('The Lost Lighthouse','A coastal mystery')));
 assert.throws(()=>quick.prompt('Hi'),/title/);
 assert.throws(()=>quick.parse(response.replace('At dawn he restored the lamp','A nonexistent scene from another story')),/quote does not appear/i);
@@ -72,6 +74,7 @@ assert(elements.main.innerHTML.includes('Paste completed story package'));
 inputs['quick-json']={value:response};
 w.__testQuick.quickReview();
 assert(elements.main.innerHTML.includes('Automatic platform recommendations'));
+assert(elements.main.innerHTML.includes('quick-image-prompt'),'Prompt to generate all ChatGPT images should be ready after story review');
 w.__testQuick.quickCreate();
 const st=JSON.parse(saved),expect=plan.platforms.reduce((n,v)=>n+v.partCount,0);
 assert.equal(st.channels.length,1,'Quick creator should create default brand automatically');
