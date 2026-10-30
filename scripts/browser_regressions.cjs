@@ -12,7 +12,7 @@ const project={id:'p',title:'Original',kind:'original',status:'draft',channelId:
    const context=await browser.newContext();const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(String(e)));
    await page.goto(base);await page.evaluate(({key,p})=>localStorage.setItem(key,JSON.stringify({version:1,channels:[{id:'ch',name:'Brand'}],projects:[p]})),{key,p});
    await page.route('**/api/status',r=>r.fulfill({json:{local:true,ffmpeg:true,transcriber:false}}));
-   await page.goto(base+'/#production');await page.waitForSelector('#production-title');
+   await page.goto(base+'/#production');await page.reload();await page.waitForSelector('#production-title');
    return {page,context,errors};
   }
   let f=await setup(),done=false;
