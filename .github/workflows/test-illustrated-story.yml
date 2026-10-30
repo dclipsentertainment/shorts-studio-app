@@ -1,0 +1,34 @@
+name: Verify image-first DClips story video
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - scripts/storyboard.py
+      - scripts/render.py
+      - scripts/test_illustrated_story.py
+      - .github/workflows/test-illustrated-story.yml
+permissions:
+  contents: read
+jobs:
+  scene-audio-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install image and video engine for offline tests
+        run: |
+          python -m pip install 'Pillow>=10,<13'
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg espeak-ng fonts-dejavu-core
+      - name: Test illustrated scenes and narrated intro
+        run: |
+          python -m compileall -q scripts
+          python scripts/test_illustrated_story.py
+      - name: Validate dashboard
+        run: |
+          node --check app.js
+          node scripts/test_caption_ui.js
+          node scripts/test_review_gate.js
