@@ -31,29 +31,32 @@
   if(/crunch|crispy|crisp|snapp|strong|hard|loud|sharp/.test(text))return 'crisp';
   return 'balanced';
  }
- function prepare(title,description=''){
+ function prepare(title,description='',options={}){
   if(typeof title!=='string'||typeof description!=='string')throw Error('Title and description must be text.');
   title=title.trim();description=description.trim();
   if(title.length<3||title.length>150)throw Error('Enter a title between 3 and 150 characters.');
   if(description.length>600)throw Error('Optional description must be under 600 characters.');
+  const duration=Number(options.duration??16),variation=Number(options.variation??0);
+  if(!Number.isInteger(duration)||duration<8||duration>32)throw Error('Duration must be 8–32 whole seconds.');
+  if(!Number.isInteger(variation)||variation<0||variation>9999)throw Error('Variation must be 0–9999.');
   const profile=profileFor(title,description);
   return {
    version:3,kind:'asmr',title,description,profile,
-   duration:16,visual_style:'asmr-pro-shot-sequencer-v3',
+   duration,variation,visual_style:'asmr-pro-shot-sequencer-v3',
    audio_style:'action-synced-foley-v3',colorway:colorway(title,description),
    sound_intensity:soundIntensity(title,description),review_required:true
   };
  }
  function describe(job){
   if(!job||!Object.prototype.hasOwnProperty.call(profiles,job.profile))throw Error('Unknown ASMR style.');
-  return {...profiles[job.profile],duration:16,profile:job.profile,colorway:job.colorway||'mint',
+  return {...profiles[job.profile],duration:job.duration,profile:job.profile,colorway:job.colorway||'mint',
    soundIntensity:job.sound_intensity||'balanced',
    sequence:[
     {title:'Material reveal',start:0,end:3,description:'See the surface before the first satisfying movement.'},
     {title:'First action',start:3,end:7,description:'A clear squish, slice, shave or pop with matched audio.'},
     {title:'Texture close-up',start:7,end:11,description:'A closer view of material detail and a different rhythm.'},
     {title:'Payoff and reset',start:11,end:16,description:'The strongest action, then a clean return for a repeatable ending.'}
-   ]};
+   ].map(s=>({...s,start:s.start*job.duration/16,end:s.end*job.duration/16}))};
  }
  function filename(now=new Date(),suffix){
   if(!(now instanceof Date)||!Number.isFinite(now.getTime()))throw Error('Invalid time.');

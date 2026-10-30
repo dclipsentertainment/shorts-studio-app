@@ -182,7 +182,7 @@
   if(eocd<0||rd16(eocd+4)||rd16(eocd+6)||rd16(eocd+8)!==rd16(eocd+10))
    throw Error('Invalid or multi-disk GitHub artifact ZIP.');
   const count=rd16(eocd+10),len=rd32(eocd+12),start=rd32(eocd+16);
-  if(count<1||count>5||start===0xffffffff||len===0xffffffff||start+len>eocd)
+  if(count<1||count>10||start===0xffffffff||len===0xffffffff||start+len>eocd)
    throw Error('Unexpected files in GitHub artifact.');
   const decoder=new TextDecoder('utf-8',{fatal:true});
   let pos=start,mp4=null;
@@ -201,10 +201,10 @@
    if(components.length>3||components.some(x=>!x||x==='..'||x==='.'))throw Error('Unsafe artifact ZIP path.');
    const basename=components.at(-1);
    const isVideo=/\.mp4$/i.test(basename),isQuality=basename==='quality-report.json',
-    isShotPlan=basename==='asmr-shot-plan.json';
-   if(!isVideo&&!isQuality&&!isShotPlan)throw Error('GitHub artifact contains an unexpected file.');
+    isShotPlan=basename==='asmr-shot-plan.json',isMetadata=/^[a-z0-9-]+\.(provenance\.json|captions\.json|captions\.srt)$/.test(basename);
+   if(!isVideo&&!isQuality&&!isShotPlan&&!isMetadata)throw Error('GitHub artifact contains an unexpected file.');
    if(isVideo&&mp4)throw Error('GitHub artifact must contain exactly one MP4.');
-   const max=isVideo?MAX_VIDEO:100000;
+   const max=isVideo?MAX_VIDEO:512000;
    if(clen>max||ulen>max||(!isVideo&&ulen<2)||local>=start||local+30>bytes.length||rd32(local)!==0x04034b50)
     throw Error('Video artifact file is oversized or damaged.');
    const lname=rd16(local+26),lextra=rd16(local+28),dataStart=local+30+lname+lextra;

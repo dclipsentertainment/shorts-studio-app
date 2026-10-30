@@ -70,3 +70,10 @@ assert(elements.main.innerHTML.includes('colourway'));
 assert(elements.main.innerHTML.includes('Original')||elements.main.innerHTML.includes('original'));
 assert.equal(JSON.parse(stored).projects.length,0,'ASMR generation should not silently publish or modify story drafts');
 console.log('PASS: 4 ASMR styles auto-selected from title, review stage, cloud job schema and no forced extra fields.');
+
+
+const varied=asmr.prepare('Soap carving','',{duration:24,variation:6});
+assert.equal(varied.duration,24);assert.equal(varied.variation,6);
+assert.equal(asmr.describe(varied).sequence[3].end,24);
+assert.throws(()=>asmr.prepare('Soap carving','',{duration:7}));
+assert.throws(()=>asmr.prepare('Soap carving','',{variation:-1}));

@@ -5,7 +5,7 @@
 'use strict';
 const STORE_KEY = 'shorts_studio_state_v1';
 const RECOVERY_KEY = 'shorts_studio_recovery_v1';
-const APP_VERSION = '0.14.16';
+const APP_VERSION = '0.14.17';
 const views = {asmr:'Satisfying ASMR',quick:'Quick Create',overview:'Overview',channels:'Channels',production:'Production flow',series:'Story series planner',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',live:'Live stream monitor',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',usage:'GitHub usage',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
 const palettes = ['#8c7aff','#ef7ab6','#50bdc3','#e9a868','#5abb92','#6b95f1'];
 const initial = () => ({version:1,channels:[],projects:[],scoutReports:[],trends:[],discovery:null,streamers:[],viralThreshold:100000,createdAt:new Date().toISOString(),demo:false});
@@ -25,11 +25,12 @@ let page = (location.hash.replace('#','') in views) ? location.hash.slice(1) : '
 let filter = 'all';
 let discoveryNiche='all';
 let aiDraft = null;
+let asmrDuration=16,asmrVariation=0;
 let asmrTitle='';
 let asmrDescription='';
 let asmrPlan=null;
 let asmrPreviewUrl='';
-try{const data=JSON.parse(localStorage.getItem('dclips_asmr_brief_v1')||'null');if(data&&typeof data.title==='string'&&typeof data.description==='string'){asmrTitle=data.title.slice(0,150);asmrDescription=data.description.slice(0,600);}}catch(_){}
+try{const data=JSON.parse(localStorage.getItem('dclips_asmr_brief_v1')||'null');if(data&&typeof data.title==='string'&&typeof data.description==='string'){asmrTitle=data.title.slice(0,150);asmrDescription=data.description.slice(0,600);asmrDuration=Number.isInteger(data.duration)&&data.duration>=8&&data.duration<=32?data.duration:16;asmrVariation=Number.isInteger(data.variation)&&data.variation>=0&&data.variation<=9999?data.variation:0;}}catch(_){}
 let quickBrief = null;
 let quickPack = null;
 let quickPrompt = '';
@@ -201,8 +202,9 @@ function asmrPage(){
   <div class="form-field"><label for="asmr-title">Video title</label><input id="asmr-title" class="field" maxlength="150" value="${esc(asmrTitle)}" placeholder="e.g. Squishing translucent slime"></div>
   <div class="form-field" style="margin-top:12px"><label for="asmr-description">Small description <span class="tiny-muted">(optional)</span></label>
   <textarea id="asmr-description" class="field" maxlength="600" rows="3" placeholder="e.g. Soft blue slime, slow satisfying squishes">${esc(asmrDescription)}</textarea></div>
+  <div class="form-field"><label for="asmr-duration">Seconds (8–32)</label><input id="asmr-duration" class="field" type="number" min="8" max="32" step="1" value="${asmrDuration}"></div><div class="form-field"><label for="asmr-variation">Variation (0–9999)</label><input id="asmr-variation" class="field" type="number" min="0" max="9999" step="1" value="${asmrVariation}"></div>
   <button type="button" class="button button-primary" data-action="asmr-plan" style="margin-top:12px">✦ Generate ASMR concept</button>
-  <p class="footnote">DClips automatically creates a 16-second ASMR Pro sequence: reveal → first action → detail close-up → payoff. It uses original 24 fps macro-style visuals and action-matched stereo sounds, rendered online.</p>
+  <p class="footnote">DClips automatically creates an editable ASMR Pro sequence: reveal → first action → detail close-up → payoff. It uses original 24 fps macro-style visuals and action-matched stereo sounds, rendered online.</p>
  </section>
  ${ready?`<section class="panel" style="margin-top:18px">
    <div class="panel-head"><h2>2 · Review the concept</h2><span class="tiny-muted">NOT YET RENDERED</span></div>
@@ -213,7 +215,7 @@ function asmrPage(){
    <div class="asmr-shot-grid">${ready.sequence.map(shot=>`<article class="asmr-shot">
     <strong>${esc(shot.title)}</strong><span class="tiny-muted">${shot.start}–${shot.end} seconds</span>
     <p>${esc(shot.description)}</p></article>`).join('')}</div><p class="secondary-note"><strong>Automatically selected:</strong> ${esc(ready.colorway)} colourway · ${esc(ready.soundIntensity)} sound intensity. These are inferred from your title and optional description.</p>
-   <p class="secondary-note"><strong>16 seconds</strong> · vertical 9:16 · 24 fps · 4 purposeful shots · macro material texture · no narration or music · original stereo Foley · no captions. Video generation happens on GitHub, not your PC.</p>
+   <p class="secondary-note"><strong>${ready.duration} seconds</strong> · vertical 9:16 · 24 fps · 4 purposeful shots · macro material texture · no narration or music · original stereo Foley · no captions. Video generation happens on GitHub, not your PC.</p>
    <p class="secondary-note">ASMR Pro uses scene-based procedural artwork and shot-matched synthetic Foley, not a photorealistic AI video model. It does not depict photorealistic hands, real slime, real kinetic sand or recorded microphone sounds. That would require actual footage or a separately available AI-video provider.</p>
    <button type="button" class="button button-primary" data-action="asmr-export">✓ Approve concept &amp; start online render</button>
    <p class="footnote">This downloads one small JSON file and opens your <strong>private</strong> GitHub upload page. Select the file there and commit to start the cloud render. No subscription image credits are used.</p>
@@ -229,9 +231,9 @@ function asmrPage(){
 function asmrPlanAction(){
  try{
   const title=$('#asmr-title')?.value||'',description=$('#asmr-description')?.value||'';
-  const plan=window.DClipsASMR.prepare(title,description);
-  asmrTitle=plan.title;asmrDescription=plan.description;asmrPlan=plan;
-  try{localStorage.setItem('dclips_asmr_brief_v1',JSON.stringify({title:asmrTitle,description:asmrDescription}))}catch(_){}
+  const plan=window.DClipsASMR.prepare(title,description,{duration:Number($('#asmr-duration')?.value??16),variation:Number($('#asmr-variation')?.value??0)});
+  asmrTitle=plan.title;asmrDescription=plan.description;asmrPlan=plan;asmrDuration=plan.duration;asmrVariation=plan.variation;
+  try{localStorage.setItem('dclips_asmr_brief_v1',JSON.stringify({title:asmrTitle,description:asmrDescription,duration:asmrDuration,variation:asmrVariation}))}catch(_){}
   if(asmrPreviewUrl){URL.revokeObjectURL(asmrPreviewUrl);asmrPreviewUrl='';}
   render();notice('ASMR concept prepared. Review the selected animation and sound before rendering.');
  }catch(e){notice('Could not prepare ASMR: '+e.message)}
@@ -239,7 +241,7 @@ function asmrPlanAction(){
 function asmrExport(){
  try{
   if(!asmrPlan)throw Error('Enter a title and review the ASMR concept first.');
-  if(!confirm('Render a four-shot, 16-second ASMR Pro video with original synchronized stereo effects on your private GitHub Actions runner? GitHub free minutes are limited. Nothing will be automatically published.'))return;
+  if(!confirm(`Render a four-shot, ${asmrPlan.duration}-second ASMR Pro video with original synchronized stereo effects on your private GitHub Actions runner? GitHub free minutes are limited. Nothing will be automatically published.`))return;
   const name=window.DClipsASMR.filename();
   downloadJSON(name,asmrPlan);
   if(typeof window.open==='function')window.open('https://github.com/dclipsentertainment/shorts-studio-production/upload/main','_blank','noopener,noreferrer');

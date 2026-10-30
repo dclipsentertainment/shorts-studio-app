@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Verify and extract source package
         env:
           IMPORT_KIND: app
@@ -71,3 +71,4 @@ jobs:
           else
             gh release create v0.14.0 dist/shorts-studio-app.zip --target "$(git rev-parse HEAD)" --title 'Shorts Studio v0.14.0' --notes 'Initial code-only application release; no private media or user data.'
           fi
+
