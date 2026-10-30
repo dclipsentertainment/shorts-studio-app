@@ -11,6 +11,8 @@ on:
       - scripts/test_local_production.py
       - scripts/test_story_duration.py
       - story-series.js
+      - quick-create.js
+      - scripts/test_quick_create.js
       - scripts/test_story_series.js
       - scripts/test_review_gate.js
       - app.js
@@ -40,6 +42,8 @@ jobs:
         run: |
           node --check app.js
           node --check story-series.js
+          node --check quick-create.js
+          node scripts/test_quick_create.js
           node scripts/test_story_series.js
           node --check github-usage.js
           node scripts/test_github_usage.js

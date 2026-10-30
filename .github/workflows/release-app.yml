@@ -33,6 +33,8 @@ jobs:
         run: |
           node --check app.js
           node --check story-series.js
+          node --check quick-create.js
+          node scripts/test_quick_create.js
           node scripts/test_story_series.js
           node --check github-usage.js
           node scripts/test_github_usage.js

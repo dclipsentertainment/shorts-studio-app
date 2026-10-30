@@ -15,6 +15,7 @@
       </a>
       <div class="side-label">WORKSPACE</div>
       <nav class="nav" aria-label="Main navigation">
+        <button data-nav="quick" class="nav-link"><span class="nav-symbol">✦</span> Quick Create</button>
         <button data-nav="overview" class="nav-link active"><span class="nav-symbol">◫</span> Overview</button>
         <button data-nav="channels" class="nav-link"><span class="nav-symbol">▤</span> Channels <span class="nav-count" id="nav-channel-count">0</span></button>
         <button data-nav="production" class="nav-link"><span class="nav-symbol">▶</span> Production flow</button>
@@ -44,7 +45,7 @@
     <div class="workspace">
       <header class="topbar">
         <div class="topbar-left"><button class="mobile-menu" id="mobile-menu" aria-label="Open menu">☰</button><span class="crumb">WORKSPACE</span><span class="slash">/</span><span id="crumb-current">Overview</span></div>
-        <div class="top-actions"><span class="date-pill" id="today-date"></span><button class="button button-primary small" data-action="new-content">＋ New content</button></div>
+        <div class="top-actions"><span class="date-pill" id="today-date"></span><button class="button button-primary small" data-action="quick-open">＋ Create story</button></div>
       </header>
       <main id="main" tabindex="-1"></main>
     </div>
@@ -52,6 +53,7 @@
   <dialog id="modal" class="modal" aria-label="Editor"><div id="modal-body"></div></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
   <script src="story-series.js" defer></script>
+  <script src="quick-create.js" defer></script>
   <script src="github-usage.js" defer></script>
   <script src="app.js" defer></script>
 </body>
