@@ -121,3 +121,16 @@
 .caption-edit-panel .checkbox-row{margin:12px 0}
 .production-video .preview-caption[role="button"]{font-size:16px;max-width:76%;min-width:34%}
 @media(max-width:560px){.caption-edit-panel{padding:11px}.preview-caption[role="button"]{font-size:15px}}
+
+/* Phase 1: verified render review */
+.production-review{scroll-margin-top:24px}
+.production-review .panel-head{flex-wrap:wrap;gap:9px}
+.review-quality{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin:18px 0}
+.review-quality>div{background:var(--panel2);border:1px solid var(--border);border-radius:11px;padding:14px;min-width:0;display:flex;flex-direction:column;gap:8px}
+.review-quality span{font-size:12px;color:var(--muted)}
+.review-quality strong{font-size:15px;overflow-wrap:anywhere}
+.review-error{color:var(--red);font-weight:650}
+.review-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:16px 0 20px}
+.review-checks .checkbox-row{background:var(--panel2);padding:14px;border:1px solid var(--border);border-radius:10px}
+@media(max-width:900px){.review-quality{grid-template-columns:repeat(2,minmax(0,1fr))}.review-checks{grid-template-columns:1fr}}
+@media(max-width:530px){.review-quality{grid-template-columns:1fr}}
