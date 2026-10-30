@@ -26,7 +26,7 @@ These are testable **creative assumptions**, not guaranteed performance outcomes
 7. Each draft stores platform code, episode number, total parts and the current portion of the original script. **Rights are unconfirmed**, rendering still requires licensed/AI-generated scene illustrations and human review, and no public publishing is enabled.
 8. Open each project in **Production flow**, adjust the script and scene images, render and check that visual changes happen at the appropriate part of the narration.
 
-The preview split is deterministic, based on whole sentences and short clauses where possible. It doesn't actually understand dramatic pacing or detect a good stopping point. Review and revise each part manually. The source script is saved with the series record for continuity.
+The planner now keeps whole sentences together, even when a sentence is unusually long, rather than chopping narration at a fixed word count. It warns when there are too few natural cuts. It still cannot guarantee dramatic pacing or semantic cliffhangers; review every ending manually. The source script is saved with the series record for continuity.
 
 ## Long videos
 
@@ -45,6 +45,19 @@ For a complete six-minute spoken script:
 Actual part lengths depend on selected narrator, pauses, editorial rewrites and natural speech. Use **actual audio-to-caption timing** at render time, not script division alone. Default image-story cover is about two seconds per episode, which adds to spoken duration.
 
 Keep each platform's audience retention, qualified views, completion and follows separately so the editor can adjust future targets based on evidence. **Never optimise solely for inflated views at the expense of meaningful story content.**
+
+## Rebalance after previewing a finished episode
+
+When you have **rendered** an episode and watched its actual finished MP4 through to the end in Production flow, DClips unlocks **Adjust the series after watching**. This is a separate step after the initial automatic recommendations.
+
+- Type a new **number of parts**, or use the numeric **seconds per part** field. Changing one recalculates the other from the complete original narration estimate; these are targets, not strict cut-off times.
+- Click **Create revised parts** to redistribute all of that platform's master-script text across full sentence boundaries.
+- The new parts are saved as draft revision 2, 3, etc. Previous drafts and finished renders remain in your project history, marked as superseded for the series planner. No existing rendered MP4 is destroyed.
+- Revised episodes start without scene assets, aligned captions, a finished render or rights confirmation because the script boundaries changed. Reattach illustrations, regenerate the narration, inspect the captions and reapprove.
+- For a sentence so long that the requested split is impossible, the planner refuses to cut in the middle and asks you to revise the master story. Part durations can differ from numeric targets to preserve complete thoughts.
+- Narrated series now refuse rendering when the last sentence is incomplete or narration is switched off. The final review requires confirmation that narration/captions finish together and the next part continues logically.
+
+This is **editorial assistance, not automatic script rewriting**: choosing a longer or shorter time cannot invent extra narrative content or stretch generated speech to an exact duration. AI illustration generation and semantic alignment of scene changes to words still require separate integration and/or hands-on review.
 
 ## Current limitations
 
