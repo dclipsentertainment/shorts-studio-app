@@ -32,6 +32,8 @@ jobs:
       - name: Sanity-check application code
         run: |
           node --check app.js
+          node --check story-series.js
+          node scripts/test_story_series.js
           node --check github-usage.js
           node scripts/test_github_usage.js
           node scripts/test_review_gate.js
