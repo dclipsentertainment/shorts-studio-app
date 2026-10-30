@@ -584,6 +584,7 @@ def render(job_path: Path, out_dir: Path) -> Path:
         if runtime<1:
             raise JobError('Not enough source footage remains for this clip.')
         ass=tempdir/'captions.ass'
+        timed=[]
         if (bool(data.get('captions',True)) or caption_style=='hook') and caption_style!='none':
             timed=data.get('caption_segments') or []
             if (mode in ('kokoro','piper') and voice and
@@ -658,6 +659,29 @@ def render(job_path: Path, out_dir: Path) -> Path:
         result=probe(output)
         if not any(s.get('codec_type')=='video' for s in result.get('streams',[])):
             raise JobError('Output MP4 has no video stream.')
+        if captions and timed and caption_style!='hook':
+            # Save editable, speech-timestamped captions for manual human review.
+            # The generated audio and transcript can disagree, so never silently approve.
+            review={
+                'source':'generated-narration-word-timestamps' if mode in ('kokoro','piper') and narration.get('sync_captions',True) else 'supplied-cues',
+                'voice':str(narration.get('voice') or ''),
+                'voice_mode':mode,
+                'needs_human_review':True,
+                'segments':timed
+            }
+            (out_dir/f'{safe}.captions.json').write_text(
+                json.dumps(review,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+            def srt_time(t):
+                millis=max(0,round(float(t)*1000))
+                hh,rem=divmod(millis,3600000)
+                mm,rem=divmod(rem,60000)
+                ss,ms=divmod(rem,1000)
+                return f'{hh:02}:{mm:02}:{ss:02},{ms:03}'
+            entries=[]
+            for i,part in enumerate(timed,1):
+                entries.append(f'{i}\n{srt_time(part["start_seconds"])} --> {srt_time(part["end_seconds"])}\n{part["text"]}\n')
+            (out_dir/f'{safe}.captions.srt').write_text('\n'.join(entries),encoding='utf-8')
+            print(f'Caption review sidecars: {len(timed)} editable cues (human review required).')
     print(f'✅ Finished: {output} ({output.stat().st_size/1024/1024:.2f} MiB)')
     return output
 
