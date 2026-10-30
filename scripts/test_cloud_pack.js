@@ -65,6 +65,13 @@ async function run(){
    {name:'output/test-video.mp4',data:mp4},
    {name:'output/quality-report.json',data:new TextEncoder().encode('{"status":"pass"}')}
  ]);
+ const proArtifact=pack.zip([
+  {name:'output/asmr-slime-pro.mp4',data:mp4},
+  {name:'output/quality-report.json',data:new TextEncoder().encode('{"status":"pass"}')},
+  {name:'output/asmr-shot-plan.json',data:new TextEncoder().encode('{"engine":"asmr-pro-v3"}')}
+ ]);
+ const proMP4=await pack.videoFromArtifactZip(new File([proArtifact],'finished-asmr-video.zip',{type:'application/zip'}));
+ assert.equal(proMP4.name,'asmr-slime-pro.mp4');
  const fileOut=await pack.videoFromArtifactZip(new File([artifact],'finished-online-video.zip',{type:'application/zip'}));
  assert.equal(fileOut.name,'test-video.mp4');
  assert.equal(fileOut.type,'video/mp4');
