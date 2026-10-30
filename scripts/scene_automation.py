@@ -82,6 +82,34 @@ def plan_scenes(title,script,spoken_seconds,max_scenes=6):
             'timing':'estimated_from_script_words','requires_review':True}
 
 
+
+def retime_to_recorded_narration(scenes, reference_seconds, recorded_seconds):
+    """Scale planned scene start cues to true generated speech duration."""
+    if isinstance(reference_seconds, bool) or isinstance(recorded_seconds, bool):
+        raise ValueError('Invalid scene timing reference.')
+    try:
+        reference = float(reference_seconds)
+        actual = float(recorded_seconds)
+    except (ValueError, TypeError):
+        raise ValueError('Invalid scene timing reference.')
+    if not (math.isfinite(reference) and math.isfinite(actual) and reference >= 5 and actual >= 5):
+        raise ValueError('Narration timing must be finite and at least five seconds.')
+    if not isinstance(scenes, list) or not 2 <= len(scenes) <= MAX_SCENES:
+        raise ValueError('No story scenes to retime.')
+    result = []
+    for index, scene in enumerate(scenes):
+        if not isinstance(scene, dict):
+            raise ValueError('Invalid illustrated scene.')
+        item = dict(scene)
+        if index and item.get('start_seconds') is not None:
+            start = float(item['start_seconds'])
+            if not math.isfinite(start) or start < 0 or start > reference:
+                raise ValueError('Invalid planned scene start.')
+            item['start_seconds'] = round(start * actual / reference, 3)
+        result.append(item)
+    return result
+
+
 def validate_image_request(payload):
     if not isinstance(payload,dict):
         raise ValueError('Image request must be an object.')
