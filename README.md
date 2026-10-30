@@ -1,13 +1,14 @@
 # Shorts Studio — DClips Entertainment
 
-Public application repository for **Shorts Studio v0.14.0**.
+Public application repository for **Shorts Studio v0.14.1**.
 
-## Status — 28 October 2026
+## Status — 30 October 2026
 
 - **Imported:** existing v0.14 dashboard, scripts, styles, and documentation.
 - **Verified:** the GitHub importer completed and ran application syntax and packaging checks.
-- **Released:** [v0.14.0](https://github.com/dclipsentertainment/shorts-studio-app/releases/tag/v0.14.0), with the code-only `shorts-studio-app.zip` asset.
-- **Not yet configured:** YouTube API credentials, channel authorisation, and unattended publishing.
+- **Released:** [v0.14.1](https://github.com/dclipsentertainment/shorts-studio-app/releases/tag/v0.14.1), with the code-only `shorts-studio-app.zip` asset.
+- **New:** GitHub usage monitor in the sidebar with an allowance tracker, scheduled private workflow reports, and optional session-only read access to live account data. See [usage monitoring](README-GITHUB-USAGE.md).
+- **Status:** The private production repo contains verified YouTube OAuth and has completed an authorised private test upload. Public posting remains opt-in.
 
 ## Download or run
 
