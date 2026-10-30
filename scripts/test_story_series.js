@@ -48,10 +48,10 @@ const context={document,location:{hash:'#series',protocol:'file:',hostname:''},
  setItem(k,v){if(k==='shorts_studio_state_v1')saved=v},removeItem(){}},
  window:{DClipsSeries:planner,DClipsUsageMonitor:{render(){return ''},afterRender(){}},addEventListener(){},scrollTo(){}},
  console,confirm:()=>true,setTimeout,clearTimeout,Date,Math,Number,JSON,Intl,URL,Blob,Array,Map,Set,String,Object,Boolean,RegExp,performance:{now(){return 0}}};
-const instrumented=app.replace(/}\)\(\);\s*$/,"window.__seriesTest={seriesPreviewAction,seriesCreate,productionRebalanceSeries,renderFingerprint,seriesRevisionPanel,
+const instrumented=app.replace(/}\)\(\);\s*$/,`window.__seriesTest={seriesPreviewAction,seriesCreate,productionRebalanceSeries,renderFingerprint,seriesRevisionPanel,
  selectProduction(id){productionProjectId=id;page='production';},
  watch(id){const p=state.projects.find(x=>x.id===id);watchedSeriesRenderKey=id+'|'+renderFingerprint(p);},
- getState(){return state;}};})();");
+ getState(){return state;}};})();`);
 assert(instrumented!==app,'Could not instrument planner UI');
 vm.runInNewContext(instrumented,context,{timeout:4000});
 assert(elements.main.innerHTML.includes('Story series planner'),'Series page missing');
