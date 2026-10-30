@@ -1262,20 +1262,25 @@ function cloudVideoPanel(current){
  const item=cloudFinishedPreviews.get(current.id);
  return `<section class="panel" style="margin-top:16px">
  <div class="panel-head"><h2>Review the finished cloud video</h2><span class="tiny-muted">AFTER GITHUB ACTIONS</span></div>
- <p class="secondary-note">Download the finished MP4 from your private GitHub Actions run. Select it here to watch on this page, then revise parts or scene timings. The MP4 stays in your browser and is never uploaded to our public site. This review is not a technical quality approval.</p>
- <input type="file" id="cloud-finished-mp4" accept="video/mp4,.mp4" aria-label="Select finished online rendered MP4">
+ <p class="secondary-note">Download the <strong>finished-online-video</strong> ZIP from your private GitHub Actions run and select the ZIP here — no extraction needed. You can also select the MP4 directly. Watch it before revising parts or scene timings. The MP4 stays in your browser and is never uploaded to our public site. This review is not a technical quality approval.</p>
+ <input type="file" id="cloud-finished-mp4" accept="video/mp4,.mp4,.zip,application/zip" aria-label="Select finished online rendered MP4">
  ${item?`<video controls playsinline id="cloud-preview-player" src="${esc(item.url)}" style="width:100%;max-height:450px;margin-top:14px"></video>
  <p class="tiny-muted">${esc(item.name)} · watch to the end to unlock revised episode controls.</p>`:'<p class="tiny-muted">No cloud-rendered MP4 selected yet.</p>'}
  </section>`;
 }
-function cloudReceiveVideo(file){
+async function cloudReceiveVideo(file){
  const p=productionProject();if(!p||!file)return;
- if(!/\.mp4$/i.test(file.name)||file.size<1000||file.size>500*1024*1024){notice('Choose a finished MP4 under 500 MiB.');return}
- const previous=cloudFinishedPreviews.get(p.id);
- if(previous)URL.revokeObjectURL(previous.url);
- cloudFinishedPreviews.set(p.id,{url:URL.createObjectURL(file),name:file.name,fingerprint:renderFingerprint(p)});
- watchedSeriesRenderKey='';
- render();notice('Finished cloud video loaded locally. Watch it from beginning to end before revising.');
+ try{
+  const originalName=file.name;
+  if(/\.zip$/i.test(file.name))file=await window.DClipsCloudPack.videoFromArtifactZip(file);
+  if(!/\.mp4$/i.test(file.name)||file.size<1000||file.size>500*1024*1024)
+   throw Error('Choose a finished MP4 or GitHub artifact ZIP within the size limits.');
+  const previous=cloudFinishedPreviews.get(p.id);
+  if(previous)URL.revokeObjectURL(previous.url);
+  cloudFinishedPreviews.set(p.id,{url:URL.createObjectURL(file),name:originalName,fingerprint:renderFingerprint(p)});
+  watchedSeriesRenderKey='';
+  render();notice('Finished online video ready for review. Watch it through to the end before revising.');
+ }catch(e){notice('Could not open GitHub video artifact: '+e.message)}
 }
 
 function cloudEpisodeImagePrompt(project){
