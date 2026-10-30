@@ -16,7 +16,7 @@ function fingerprint(p) {
   p.script||'',p.timedCaptions||'',p.voiceMode||'',p.audioPath||'',p.voiceName||'',p.hookText||'',
   p.captionX??50,p.captionY??75,p.channelId,p.captionStyle||'classic',p.cropFocus||'center',
   p.motion||'none',p.background||'midnight',p.visualMode||'classic',p.visualTheme||'aurora',
-  p.visualTransition||'fade',JSON.stringify(p.visualScenes||[])]);
+  p.visualTransition||'fade',JSON.stringify(p.visualScenes||[]),Number(p.sceneTimingReference||0)]);
 }
 function html(p){
  const els={};

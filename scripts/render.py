@@ -582,6 +582,17 @@ def render(job_path: Path, out_dir: Path) -> Path:
             runtime=min(runtime,source_length-start)
         if procedural and visual_mode in ('storyboard','illustrated'):
             try:
+                # Speech is generated before drawing scenes. Scale script-based
+                # time cues to the actual narrator WAV duration so picture
+                # changes follow narration speed instead of a fixed estimate.
+                reference=(data.get('visuals') or {}).get('scene_timing_reference_seconds')
+                if visual_mode=='illustrated' and reference is not None:
+                    from scene_automation import retime_to_recorded_narration
+                    from copy import deepcopy
+                    data=deepcopy(data)
+                    actual_spoken=duration_of(voice) if voice else runtime-intro_seconds
+                    data['visuals']['scenes']=retime_to_recorded_narration(
+                        data['visuals'].get('scenes') or [],reference,actual_spoken)
                 from storyboard import create_story_video
                 video=create_story_video(data,runtime,tempdir/'story-scenes')
             except (ImportError,ValueError,OSError) as exc:

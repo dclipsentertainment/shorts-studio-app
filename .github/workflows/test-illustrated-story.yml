@@ -5,6 +5,8 @@ on:
     paths:
       - scripts/storyboard.py
       - scripts/render.py
+      - scripts/scene_automation.py
+      - scripts/test_scene_automation.py
       - scripts/test_illustrated_story.py
       - scripts/test_illustrated_ui.js
       - app.js
@@ -30,6 +32,7 @@ jobs:
         run: |
           python -m compileall -q scripts
           python scripts/test_illustrated_story.py
+          python scripts/test_scene_automation.py
       - name: Validate dashboard
         run: |
           node --check app.js
