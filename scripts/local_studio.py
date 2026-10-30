@@ -55,8 +55,8 @@ def validate_job(payload):
         start=float((payload.get('source') or {}).get('start_seconds') or 0)
     except (TypeError,ValueError):
         raise ValueError('Invalid clip timing.')
-    if not (3<=duration<=180 and 0<=start<=86400):
-        raise ValueError('Clip must be 3–180 seconds with a nonnegative source start.')
+    if not (3<=duration<=(600 if kind=='original' else 180) and 0<=start<=86400):
+        raise ValueError('Clips allow 3–180 seconds; original stories allow up to 600 seconds.')
     source=payload.get('source') or {}
     if source.get('url'):
         raise ValueError('Remote media URLs are disabled in the local one-click workflow.')
@@ -71,7 +71,7 @@ def validate_job(payload):
         media_path(narration.get('audio_path'))
     if len(str(payload.get('script') or ''))>10000:
         raise ValueError('Script is too long.')
-    if len(payload.get('caption_segments') or [])>250:
+    if len(payload.get('caption_segments') or [])>900:
         raise ValueError('Too many captions.')
     if len(str(payload.get('title') or ''))>200:
         raise ValueError('Title is too long.')
@@ -105,7 +105,7 @@ def begin_task(job, kind):
                     try:
                         from transcribe import transcribe
                         from render import duration_of
-                        runtime=min(180,duration_of(result))
+                        runtime=min(600,duration_of(result))
                         cues,detected=transcribe(result,0,runtime,'tiny',None,4)
                         if cues:
                             job['caption_segments']=cues
@@ -267,7 +267,7 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(obj,dict) or obj.get('media') is None: raise ValueError('Choose licensed source audio/video.')
             media_path(obj['media'])
             if obj.get('model') not in ('tiny','base','small'): raise ValueError('Unknown model.')
-            if not (3<=float(obj.get('duration',0))<=180):raise ValueError('Invalid duration.')
+            if not (3<=float(obj.get('duration',0))<=600):raise ValueError('Invalid duration.')
             if not shutil.which('ffmpeg'):raise ValueError('FFmpeg is missing.')
             if __import__('importlib').util.find_spec('faster_whisper') is None:raise ValueError('Optional faster-whisper is not installed.')
             return self.response(202,{'task_id':begin_task(obj,'transcribe')})
