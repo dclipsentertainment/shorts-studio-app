@@ -1,6 +1,6 @@
 {
-  "version": "0.14.4",
+  "version": "0.14.5",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "Live streamer watchlist and review-first clip planning; four natural male/female voice choices; hook-only captions and original-audio mode"
+  "notes": "One-click AI voiceover removal, editable caption or headline text, draggable on-video captions, exact X/Y position in exported MP4; legal reuse guidance"
 }
