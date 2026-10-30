@@ -1,6 +1,6 @@
 {
-  "version": "0.14.12",
+  "version": "0.14.13",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "Batch import ChatGPT images, preview and reorder scenes, create private render ZIP, render completely on GitHub Actions, and review MP4 in DClips"
+  "notes": "One-click ChatGPT clipboard or JSON import, one-ZIP image batch import, combined GitHub render ZIP download/upload handoff, direct finished-artifact ZIP playback"
 }
