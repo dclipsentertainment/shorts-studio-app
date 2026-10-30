@@ -166,6 +166,54 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     return True
 
 
+def make_ass_hook_only(hook: str, runtime: float, dest: Path) -> bool:
+    """Top-of-screen hook only; do not invent a spoken transcript for clips."""
+    hook = hook.strip()[:95]
+    if not hook or runtime < 1:
+        return False
+    header = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 720
+PlayResY: 1280
+WrapStyle: 0
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Hook,DejaVu Sans,40,&H00FFFFFF,&H00FFFFFF,&HDD101019,&HAA101019,-1,0,0,0,100,100,0,0,3,11,0,8,40,40,80,1
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    end = min(runtime, max(2.8, min(5.2, runtime * .35)))
+    msg = ass_escape(hook)
+    dest.write_text(header + f"Dialogue: 0,0:00:00.00,{ass_time(end)},Hook,,0,0,0,,{msg}\\n", encoding="utf-8")
+    return True
+
+
+def apply_caption_position(dest: Path, x_percent: float, y_percent: float, *, hook_only: bool) -> None:
+    """Apply an editor-selected position to ASS captions in the final 720x1280 MP4.
+
+    Dialogue subtitle position uses the same centre anchor as browser preview.
+    A separate automatic title hook stays at its original top location unless
+    the editor explicitly selected hook-only content.
+    """
+    try:
+        x, y = float(x_percent), float(y_percent)
+    except (TypeError, ValueError) as exc:
+        raise JobError("Caption position must contain numeric percentages.") from exc
+    if not all(math.isfinite(z) for z in (x,y)) or not (20 <= x <= 80 and 12 <= y <= 85):
+        raise JobError("Caption position outside editor safe bounds (x 20–80%, y 12–85%).")
+    pos = r"{\an5\pos(" + str(round(x * 7.2)) + "," + str(round(y * 12.8)) + ")}"
+    lines = dest.read_text(encoding="utf-8").splitlines()
+    result = []
+    for line in lines:
+        if line.startswith("Dialogue:"):
+            parts = line.split(",", 9)
+            if len(parts) == 10 and (hook_only or parts[3] != "Hook"):
+                parts[9] = pos + parts[9]
+                line = ",".join(parts)
+        result.append(line)
+    dest.write_text("\n".join(result) + "\n", encoding="utf-8")
+
+
 def make_ass_word_pop(script: str, runtime: float, title: str, dest: Path) -> bool:
     """Approximate word-group pop captions without pretending to have ASR timestamps."""
     raw = re.sub(r"\[[^]]+\]", "", script)
@@ -328,6 +376,120 @@ def voice_flite(script: str, path: Path, tempdir: Path) -> Path:
     return path
 
 
+PIPER_VOICES = {
+    "en_GB-cori-high": "UK English, female, public-domain source recordings",
+    "en_GB-cori-medium": "UK English, female, public-domain source recordings",
+    "en_US-john-medium": "US English, male, public-domain source recordings",
+    "en_US-norman-medium": "US English, male, public-domain source recordings",
+}
+
+
+def voice_piper(script: str, path: Path, model_name: str) -> Path:
+    """Synthesize a neural narration using a previously downloaded Piper voice.
+
+    Models are deliberately allowlisted to voices whose source recordings are
+    documented as public domain. This mode never needs a paid API or account.
+    """
+    if model_name not in PIPER_VOICES:
+        raise JobError("Unapproved Piper voice model. Choose one of: " + ", ".join(PIPER_VOICES))
+    cleaned = re.sub(r'\[[^]]+\]', '', script).strip()
+    if not cleaned or len(cleaned) > 4000:
+        raise JobError("Piper narration requires a script between 1 and 4000 characters.")
+    model_dir = ROOT / ".voice-models"
+    model_file = model_dir / (model_name + ".onnx")
+    config_file = model_dir / (model_name + ".onnx.json")
+    if not model_file.is_file() or not config_file.is_file():
+        raise JobError("Neural voice not downloaded. Run: python -m piper.download_voices --data-dir .voice-models " + model_name)
+    run([sys.executable, "-m", "piper", "-m", str(model_file), "-f", str(path), "--", cleaned])
+    if not path.is_file() or path.stat().st_size < 1000:
+        raise JobError("Piper did not generate a valid narration WAV file.")
+    return path
+
+
+KOKORO_VOICES = {
+    "af_heart": "en-us",
+    "af_bella": "en-us",
+    "bf_emma": "en-gb",
+    "bm_george": "en-gb",
+    "am_michael": "en-us",
+}
+
+
+def voice_kokoro(script: str, path: Path, voice_name: str, speed: float = 0.96) -> Path:
+    """Run expressive Kokoro ONNX speech synthesis offline with allowlisted voices."""
+    if voice_name not in KOKORO_VOICES:
+        raise JobError("Unsupported Kokoro voice. Use: " + ", ".join(KOKORO_VOICES))
+    if not math.isfinite(speed) or not 0.8 <= speed <= 1.15:
+        raise JobError("Kokoro voice speed must be between 0.8 and 1.15.")
+    clean = re.sub(r'\[[^]]+\]', '', script).strip()
+    if not clean or len(clean) > 4000:
+        raise JobError("Kokoro narration requires a script between 1 and 4000 characters.")
+    model_dir = ROOT / ".voice-models" / "kokoro"
+    model_file = model_dir / "kokoro-v1.0.onnx"
+    voices_file = model_dir / "voices-v1.0.bin"
+    if not model_file.is_file() or not voices_file.is_file():
+        raise JobError("Kokoro model missing. Run the neural voice preview workflow to prepare it.")
+    try:
+        import soundfile as sf
+        from kokoro_onnx import Kokoro
+        model = Kokoro(str(model_file), str(voices_file))
+        samples, rate = model.create(clean, voice=voice_name, speed=speed, lang=KOKORO_VOICES[voice_name])
+        sf.write(str(path), samples, rate, subtype="PCM_16")
+    except (ImportError, ValueError, RuntimeError, OSError) as exc:
+        raise JobError(f"Kokoro neural voice generation failed: {type(exc).__name__}") from exc
+    if not path.is_file() or path.stat().st_size < 1000:
+        raise JobError("Kokoro did not produce a narration WAV.")
+    return path
+
+
+def align_voice_captions(audio: Path, script: str, max_runtime: float) -> list[dict]:
+    """Measure speech timestamps from the actual synthesized audio, never from script length.
+
+    faster-whisper provides word-level alignment estimates using the WAV produced
+    by the selected TTS model. If inference fails or significantly disagrees
+    with the script, abort instead of publishing misleading on-screen words.
+    """
+    from difflib import SequenceMatcher
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError as exc:
+        raise JobError("Speech-synced captions require faster-whisper. Install it before rendering.") from exc
+    model = WhisperModel("base.en", device="cpu", compute_type="int8")
+    segments, _ = model.transcribe(str(audio), language="en", word_timestamps=True,
+                                   beam_size=5, vad_filter=False, condition_on_previous_text=False)
+    words = []
+    for segment in segments:
+        for w in (segment.words or []):
+            text = (w.word or "").strip()
+            a, b = float(w.start), float(w.end)
+            if text and math.isfinite(a) and math.isfinite(b) and b > a and a >= 0 and a < max_runtime:
+                words.append((a, min(max_runtime, b), text))
+    if not words:
+        raise JobError("No speech detected in AI narration; cannot claim captions are aligned.")
+    normalize = lambda x: re.sub(r"[^a-z0-9 ]", "", x.lower()).split()
+    recognized = " ".join(w[2] for w in words)
+    intended = re.sub(r"\[[^]]+\]", "", script)
+    match = SequenceMatcher(None, normalize(recognized), normalize(intended)).ratio()
+    if match < 0.72:
+        raise JobError(f"Voice transcription differs from script (similarity {match:.0%}); review spoken words.")
+    result = []
+    # Three-word captions appear when speech is heard, including pauses.
+    # The ASR estimates word boundaries; unlike proportional captioning,
+    # pauses in generated narration are accounted for.
+    for i in range(0, len(words), 3):
+        part = words[i:i+3]
+        a, b = part[0][0], part[-1][1]
+        if result and a < result[-1]["end_seconds"]:
+            a = result[-1]["end_seconds"]
+        if b > a + .025:
+            result.append({"start_seconds": round(a, 3),
+                           "end_seconds": round(b, 3),
+                           "text": " ".join(w[2] for w in part)})
+    if not result:
+        raise JobError("No nonoverlapping word captions produced from narration.")
+    return result
+
+
 def render(job_path: Path, out_dir: Path) -> Path:
     if not shutil.which('ffmpeg') or not shutil.which('ffprobe'):
         raise JobError('FFmpeg and ffprobe are required on your machine or GitHub Actions runner.')
@@ -348,7 +510,7 @@ def render(job_path: Path, out_dir: Path) -> Path:
         raise JobError('Start time must be non-negative.')
     narration=data.get('narration') or {}
     mode=narration.get('mode','none')
-    if mode not in ('none','basic','file'):
+    if mode not in ('none','basic','file','piper','kokoro'):
         raise JobError('Unsupported narration mode.')
     script=str(data.get('script') or '')
     if kind=='original' and re.search(r'\[(RESEARCH|EXAMPLE|PAYOFF|HOOK|MAIN|END)\]',script,re.I):
@@ -360,7 +522,7 @@ def render(job_path: Path, out_dir: Path) -> Path:
     crop_focus=options.get('crop_focus','center')
     motion=options.get('motion','none')
     backdrop=options.get('background','midnight')
-    if caption_style not in ('classic','word-pop','kinetic','none') or crop_focus not in ('center','left','right','smart-face') or motion not in ('none','gentle-pan') or backdrop not in ('midnight','ocean','plum'):
+    if caption_style not in ('classic','word-pop','kinetic','hook','none') or crop_focus not in ('center','left','right','smart-face') or motion not in ('none','gentle-pan') or backdrop not in ('midnight','ocean','plum'):
         raise JobError('Unsupported editing preset.')
     title=str(data.get('title') or 'Untitled Short')
     out_dir.mkdir(parents=True,exist_ok=True)
@@ -402,6 +564,10 @@ def render(job_path: Path, out_dir: Path) -> Path:
                 raise JobError('Narration audio file contains no audio stream.')
         if mode=='basic':
             voice=voice_flite(script,tempdir/'voice.wav',tempdir)
+        if mode=='piper':
+            voice=voice_piper(script,tempdir/'neural-voice.wav',str(narration.get('voice') or 'en_GB-cori-high'))
+        if mode=='kokoro':
+            voice=voice_kokoro(script,tempdir/'kokoro-narration.wav',str(narration.get('voice') or 'af_heart'),float(narration.get('speed',0.96)))
         runtime=requested
         if kind=='original' and voice:
             runtime=min(180,max(requested,duration_of(voice)+0.2))
@@ -418,9 +584,16 @@ def render(job_path: Path, out_dir: Path) -> Path:
         if runtime<1:
             raise JobError('Not enough source footage remains for this clip.')
         ass=tempdir/'captions.ass'
-        if bool(data.get('captions',True)) and caption_style!='none':
+        if (bool(data.get('captions',True)) or caption_style=='hook') and caption_style!='none':
             timed=data.get('caption_segments') or []
-            if caption_style=='kinetic':
+            if (mode in ('kokoro','piper') and voice and
+                    narration.get('sync_captions', True) and not timed):
+                timed = align_voice_captions(voice, script, runtime)
+                print(f'Speech-aligned captions from generated audio: {len(timed)} cues.')
+
+            if caption_style=='hook':
+                captions=make_ass_hook_only(str(options.get('hook_text') or title),runtime,ass)
+            elif caption_style=='kinetic':
                 if timed:
                     # Validate all timestamp rules before composing kinetic groups.
                     make_ass_timed(timed,runtime,title,tempdir/'validate.ass','classic')
@@ -433,6 +606,11 @@ def render(job_path: Path, out_dir: Path) -> Path:
                                 else make_ass(script,runtime,title,ass)))
         else:
             captions=False
+        if captions:
+            default_y = 19 if caption_style == "hook" else 75
+            apply_caption_position(ass, options.get("caption_x", 50),
+                                   options.get("caption_y", default_y),
+                                   hook_only=caption_style == "hook")
         horizontal={'left':'0','center':'(iw-720)/2','right':'iw-720'}
         x=horizontal.get(crop_focus,'(iw-720)/2')
         if crop_focus=='smart-face' and not procedural:
