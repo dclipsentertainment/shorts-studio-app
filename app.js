@@ -1127,6 +1127,18 @@ async function productionCheckBackend(){
   const response=await fetch('/api/status',{cache:'no-store'});if(!response.ok)throw Error('Unavailable');productionBackend=await response.json();
   node.textContent=productionBackend.ffmpeg?'✓ Local engine ready: you can upload footage and render MP4s on this computer. '+(productionBackend.transcriber?'Speech recognition is available.':'For real speech transcription, optional faster-whisper must be installed.')+' '+(productionBackend.face_tracking?'Face-aware framing is available.':'Optional OpenCV is needed for face-aware framing; otherwise center crop is used.'):'Local server connected, but FFmpeg/ffprobe are missing. You can edit and export jobs; rendering requires FFmpeg.';
   productionRestoreDisplay();
+  const last=latestRender(productionProject());
+  if(last){
+   const player=$('#production-output-video');
+   if(player&&!player.getAttribute('src')){player.src=last.url;player.load()}
+   let link=$('#production-download');
+   if(!link){
+    link=document.createElement('a');link.id='production-download';
+    link.className='button button-primary small';link.textContent='⇩ Save rendered MP4';
+    document.querySelector('.production-output')?.appendChild(link);
+   }
+   link.href=last.url;link.download='';
+  }
  }catch(_){node.textContent='Local rendering engine not connected. Open via OPEN-PRODUCTION-STUDIO.cmd, or export a job JSON for later.'}
 }
 function productionDraftSave(){
@@ -1287,7 +1299,8 @@ async function productionRender(){
  }catch(e){if(prog)prog.textContent=`Render failed: ${e.message}`;notice(`Render failed: ${e.message}`)}finally{productionBusy=false}
 }
 function productionApprove(){
- const p=productionProject(),last=latestRender(p);
+ let p;try{p=productionDraftSave()}catch(e){notice('Save your changes before approval: '+e.message);return}
+ const last=latestRender(p);
  if(!p||!last){notice('Render the current version of your video before approving.');return}
  if(last.quality?.status==='fail'||!last.quality){notice('A passing technical quality report is required.');return}
  const issues=renderBlockers(p);
