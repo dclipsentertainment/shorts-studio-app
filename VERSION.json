@@ -1,6 +1,6 @@
 {
-  "version": "0.14.10",
+  "version": "0.14.11",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "Chronological story scene plans, narrator-duration-aligned scene timing, optional explicitly approved paid image illustrations, local secret-only API key"
+  "notes": "Title-first Quick Create: optional short description; ChatGPT story/scene prompt, review, image request and automatically prepared multi-platform drafts"
 }
