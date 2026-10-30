@@ -1288,12 +1288,19 @@ async function productionRender(){
   const result=await productionAPI('/api/render',job);
   const done=await productionPoll(result.task_id);
   productionRenderUrl=done.video_url;
+  // Auto-aligned cues are the ones already rendered into this MP4.
+  // Save them before computing the render fingerprint, otherwise the
+  // final review would incorrectly think the newly rendered video is stale.
+  if(Array.isArray(done.caption_segments)){
+   productionCues=parseTimedCaptions(JSON.stringify(done.caption_segments),p.duration);
+   productionPaint();
+   productionDraftSave();
+  }
   p.lastRender={url:done.video_url,fingerprint:renderFingerprint(p),quality:done.quality_report||null,renderedAt:new Date().toISOString(),approved:false};
   if(!save())throw Error('Video rendered but could not save review status. Export your workspace backup.');
   const vid=$('#production-output-video');if(vid){vid.src=productionRenderUrl;vid.load()}
   let link=$('#production-download');if(!link){link=document.createElement('a');link.id='production-download';link.className='button button-primary small';link.textContent='⇩ Save rendered MP4';document.querySelector('.production-output')?.appendChild(link)}
   link.href=productionRenderUrl;link.download='';
-  if(Array.isArray(done.caption_segments)){productionCues=done.caption_segments;productionPaint();productionDraftSave();}
   if(prog)prog.textContent='✓ MP4 ready locally. Watch the full output before uploading to any platform.'+(done.warning?' Note: '+done.warning:'');
   render();notice('Finished MP4 created. Watch it, then complete the approval checklist.');
  }catch(e){if(prog)prog.textContent=`Render failed: ${e.message}`;notice(`Render failed: ${e.message}`)}finally{productionBusy=false}
