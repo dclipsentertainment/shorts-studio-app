@@ -32,8 +32,9 @@ def check_video(path: Path) -> dict:
     dur=float(info.get('format',{}).get('duration') or 0)
     width=int(video.get('width') or 0);height=int(video.get('height') or 0)
     errors=[];warnings=[]
-    if not math.isfinite(dur) or not 3<=dur<=180:errors.append('Duration outside 3–180 second target')
+    if not math.isfinite(dur) or not 3<=dur<=600:errors.append('Duration outside 3–600 second supported range')
     if width<540 or height<960 or width*16!=height*9:errors.append('Video is not portrait 9:16 at 540x960 or above')
+    if dur>180:warnings.append('Long-form video: review retention and platform-specific publication requirements')
     if video.get('codec_name')!='h264':warnings.append('H.264 is recommended for broad compatibility')
     if video.get('pix_fmt') not in ('yuv420p','yuvj420p'):warnings.append('Use 4:2:0 8-bit pixel format for compatibility')
     if not audio:warnings.append('No audio stream: verify this is intentional')
