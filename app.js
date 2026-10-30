@@ -1318,10 +1318,12 @@ function productionDraftSave(){
  if(p.kind==='original'){
   const sceneLines=($('#production-scenes')?.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(sceneLines.length>8)throw Error('Use 1–8 scene headlines.');
+  const previousBeats=(p.visualScenes||[]).map(x=>[x.headline,x.start_seconds]).map(x=>JSON.stringify(x)).join('|');
   p.visualScenes=sceneLines.map(line=>{const pos=line.indexOf(' | ');let headline=(pos<0?line:line.slice(0,pos)).trim();const image_path=pos<0?'':line.slice(pos+3).trim();let start_seconds=null;const match=headline.match(/^([0-9]+(?:\.[0-9]+)?)@(.+)$/);if(match){start_seconds=Number(match[1]);headline=match[2].trim();}if(!headline||headline.length>95)throw Error('Scene descriptions must be 1–95 characters.');if(image_path&&!/^(user-data\/media\/|assets\/)[A-Za-z0-9._/-]+\.(jpg|jpeg|png|webp)$/i.test(image_path))throw Error('Image paths must be project-relative JPG, PNG or WebP files.');return {headline,image_path,start_seconds};});
+  const updatedBeats=p.visualScenes.map(x=>[x.headline,x.start_seconds]).map(x=>JSON.stringify(x)).join('|');
+  if(previousBeats!==updatedBeats){p.sceneTimingReference=null;p.scenePlanText=[];}
   p.visualMode=$('#production-visual-mode')?.value||'illustrated';p.visualTheme=$('#production-visual-theme')?.value||'aurora';p.visualTransition=$('#production-visual-transition')?.value||'fade';
  }
- if(p.kind==='original' && ($('#production-scenes')?.value||'')!==((p.visualScenes||[]).map(x=>(x.start_seconds==null?'':x.start_seconds+'@')+x.headline+(x.image_path?' | '+x.image_path:'')).join('\n')))p.sceneTimingReference=null;
  p.voiceMode=$('#production-voice')?.value||'none';p.voiceName=$('#production-voice-name')?.value||'af_heart';p.captionStyle=$('#production-caption-style')?.value||'classic';p.captionX=captionPosition({captionX:$('#production-caption-x')?.value},p.captionStyle).x;p.captionY=captionPosition({captionY:$('#production-caption-y')?.value},p.captionStyle).y;p.cropFocus=$('#production-crop-focus')?.value||'center';
  p.rights=Boolean($('#production-rights')?.checked);
  p.timedCaptions=cues.length?JSON.stringify(cues):'';p.updatedAt=new Date().toISOString();
@@ -1411,6 +1413,10 @@ async function productionAutoScenes(){
   $('#production-visual-mode').value='illustrated';
   p.sceneTimingReference=plan.spoken_seconds;
   p.scenePlanText=plan.scenes.map(beat=>beat.beat_text||beat.headline);
+  p.visualScenes=plan.scenes.map(beat=>({headline:beat.headline,image_path:'',
+    start_seconds:beat.start_seconds??null}));
+  p.sourcePath='';p.sourceUrl='';p.updatedAt=new Date().toISOString();
+  save();
   const summary=$('#visual-scene-summary');
   if(summary)summary.textContent='Prepared '+rows.length+' chronological scenes, using estimated start times relative to the first spoken word. Actual narration duration will adjust the timings at render. Check each scene, then attach or generate its picture.';
   notice('Story scenes and timing planned. Review descriptions, then create the illustrations.');
