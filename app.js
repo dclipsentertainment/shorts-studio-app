@@ -5,7 +5,7 @@
 'use strict';
 const STORE_KEY = 'shorts_studio_state_v1';
 const RECOVERY_KEY = 'shorts_studio_recovery_v1';
-const APP_VERSION = '0.14.9';
+const APP_VERSION = '0.14.10';
 const views = {overview:'Overview',channels:'Channels',production:'Production flow',series:'Story series planner',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',live:'Live stream monitor',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',usage:'GitHub usage',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
 const palettes = ['#8c7aff','#ef7ab6','#50bdc3','#e9a868','#5abb92','#6b95f1'];
 const initial = () => ({version:1,channels:[],projects:[],scoutReports:[],trends:[],discovery:null,streamers:[],viralThreshold:100000,createdAt:new Date().toISOString(),demo:false});
