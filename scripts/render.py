@@ -574,7 +574,10 @@ def render(job_path: Path, out_dir: Path) -> Path:
             voice=voice_kokoro(script,tempdir/'kokoro-narration.wav',str(narration.get('voice') or 'af_heart'),float(narration.get('speed',0.96)))
         runtime=requested
         if kind=='original' and voice:
-            runtime=min(600,max(requested,duration_of(voice)+intro_seconds+0.2))
+            actual_audio_duration=duration_of(voice)+intro_seconds+0.2
+            if actual_audio_duration>600:
+                raise JobError('Narration exceeds ten minutes including the title. Split the story into smaller chapters.')
+            runtime=max(requested,actual_audio_duration)
         if kind=='clip' and source_length:
             runtime=min(runtime,source_length-start)
         if procedural and visual_mode in ('storyboard','illustrated'):
