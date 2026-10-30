@@ -165,3 +165,19 @@
 .cloud-image-item img{display:block;aspect-ratio:9/16;max-height:190px;object-fit:cover}
 .cloud-image-item select{width:100%;max-width:100%;font-size:12px}
 @media(max-width:480px){.cloud-image-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* ASMR concept review: decorative browser animation is NOT the actual rendered MP4. */
+.asmr-concept{height:250px;max-width:440px;position:relative;overflow:hidden;display:grid;place-items:center;
+ border-radius:20px;background:radial-gradient(ellipse at 50% 58%,#183f65,#111528 68%);margin-top:14px}
+.asmr-concept .asmr-shape{width:150px;height:140px;border-radius:43% 57% 56% 44%;
+ background:linear-gradient(135deg,#abffe7,#11bbab);box-shadow:inset 0 -19px 35px #055f76,0 12px 45px #2effcf55;
+ animation:asmr-pulse 2s ease-in-out infinite}
+.asmr-concept small{position:absolute;bottom:12px;color:#ddedf7;font-size:11px;text-align:center}
+.asmr-concept-sand{background:radial-gradient(ellipse,#a66a47,#342028)}
+.asmr-concept-sand .asmr-shape{border-radius:16px;background:repeating-linear-gradient(0deg,#efb77e 0 5px,#d99560 6px 11px);box-shadow:0 18px 35px #321e1c}
+.asmr-concept-soap{background:radial-gradient(ellipse,#4f54a4,#131738)}
+.asmr-concept-soap .asmr-shape{border-radius:26%;background:linear-gradient(135deg,#d6e5ff,#7d9beb);box-shadow:inset 0 -15px 20px #515bb1,0 15px 45px #b6d0ff33}
+.asmr-concept-bubbles{background:radial-gradient(ellipse,#367f9c,#141f45)}
+.asmr-concept-bubbles .asmr-shape{border-radius:50%;background:radial-gradient(circle at 32% 24%,#f1fbff 5%,#90e9fb 23%,#3792d3 75%);box-shadow:inset 0 -8px 19px #2c5caa,0 0 35px #91deff99}
+@keyframes asmr-pulse{0%,100%{transform:scale(1,1) rotate(-2deg)}50%{transform:scale(1.22,.76) rotate(1deg)}}
+@media(prefers-reduced-motion:reduce){.asmr-concept .asmr-shape{animation:none}}
