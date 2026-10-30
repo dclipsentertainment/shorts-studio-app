@@ -1,6 +1,6 @@
 {
-  "version": "0.14.2",
+  "version": "0.14.3",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-10-30",
-  "notes": "Download once and automatically update DClips via verified GitHub releases at every Windows launch; separate pages and retained local data"
+  "notes": "Cloudflare Pages static deployment, secure public asset build, TikTok and Facebook channels and platform-specific views and earnings"
 }
