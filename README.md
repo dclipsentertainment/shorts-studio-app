@@ -19,6 +19,10 @@ The source code is already prepared for Cloudflare Pages with a restricted publi
 
 The private repo includes cloud rendering, expressive AI voice synthesis, original storyboards, technical quality checks, and manually approved **private** YouTube uploads. TikTok, Instagram and Facebook publishing integrations are planned, not currently connected. Automatic publication is intentionally disabled.
 
+## Story Series — Instagram parts, YouTube Shorts, TikTok and complete Facebook stories
+
+Open the **Story series planner** from the left menu, paste your complete narrated script, select platforms and adjust their recommended episode lengths. The planner shows numbered parts and can create editable video drafts in Content Studio, with no automatic uploads. Original stories now support planning and rendering up to 10 minutes; clip projects remain up to three minutes. Read [Story Series](README-STORY-SERIES.md) for details, current caveats and manual review steps.
+
 ## Phase 1 production review
 
 - **Working now:** Local FFmpeg output and technical MP4 quality reports (codec, 9:16, duration, SHA-256), followed by four explicit human review checks. Editing the project invalidates previous approvals. Includes editor-imported speech-timed subtitle cues and a video-comparison link. See [Quality review](README-QUALITY-REVIEW.md).
