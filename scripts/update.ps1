@@ -68,7 +68,8 @@ try {
         } finally { $archive.Dispose() }
         $required = @('VERSION.json','index.html','styles.css','app.js','story-series.js','github-usage.js',
             'OPEN-DASHBOARD.cmd','scripts/update.ps1','scripts/local_studio.py')
-        if ($latest -ge [version]'0.15.0') { $required += @('creator.js','creator-support.js','recovery.js','scripts/render_cache.py') }
+        if ($latest -ge [version]'0.15.0') { $required += @('creator.js','recovery.js','scripts/render_cache.py') }
+        if ($latest -ge [version]'0.16.0') { $required += @('creator-support.js') }
         foreach ($essential in $required) {
             if (-not $seen.ContainsKey($essential)) { throw "Update lacks required file: $essential" }
         }

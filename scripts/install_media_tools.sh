@@ -16,7 +16,7 @@ mkdir -p "$cache_dir/partial"
 # HTTPS avoids runner-specific HTTP proxy stalls. Keep distro signature verification enabled.
 sudo python3 - <<'PY'
 from pathlib import Path
-paths=[Path('/etc/apt/sources.list'),*Path('/etc/apt/sources.list.d').glob('*.sources'),*Path('/etc/apt/sources.list.d').glob('*.list')]
+paths=[Path('/etc/apt/sources.list'),*Path('/etc/apt').glob('*mirrors*.txt'),*Path('/etc/apt/sources.list.d').glob('*.sources'),*Path('/etc/apt/sources.list.d').glob('*.list')]
 for p in paths:
     if p.is_file():
         s=p.read_text()
@@ -35,7 +35,7 @@ for attempt in 1 2; do
   # Retry an alternate official mirror, retaining signed apt package verification.
   sudo python3 - <<'PY'
 from pathlib import Path
-for p in [Path('/etc/apt/sources.list'),*Path('/etc/apt/sources.list.d').glob('*.sources'),*Path('/etc/apt/sources.list.d').glob('*.list')]:
+for p in [Path('/etc/apt/sources.list'),*Path('/etc/apt').glob('*mirrors*.txt'),*Path('/etc/apt/sources.list.d').glob('*.sources'),*Path('/etc/apt/sources.list.d').glob('*.list')]:
     if p.is_file():p.write_text(p.read_text().replace('https://azure.archive.ubuntu.com','https://archive.ubuntu.com'))
 PY
 done

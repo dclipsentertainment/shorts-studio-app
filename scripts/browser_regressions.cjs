@@ -69,7 +69,7 @@ const project={id:'p',title:'Original',kind:'original',status:'draft',channelId:
   await f.page.check('#creator-rights');await f.page.check('#creator-facts');await f.page.click('[data-creator="render"]');
   await f.page.waitForFunction(key=>JSON.parse(localStorage.getItem(key)).creatorJobs?.some(j=>j.status==='queued'),key);assert(uploaded);
   await f.page.click('[data-creator="refresh"]');await f.page.waitForFunction(()=>document.querySelector('#main').textContent.includes('success'));
-  const artifactBytes=await f.page.evaluate(()=>{const video=new Uint8Array(1100);video.set([102,116,121,112],4);return Array.from(window.DClipsCloudPack.zip([{name:'finished.mp4',bytes:video}]));});
+  const artifactBytes=await f.page.evaluate(()=>{const video=new Uint8Array(1100);video.set([102,116,121,112],4);return Array.from(window.DClipsCloudPack.zip([{name:'finished.mp4',data:video}]));});
   await f.page.route('**/api/cloud-artifact?id=987',r=>r.fulfill({contentType:'application/zip',body:Buffer.from(artifactBytes)}));
   await f.page.click('[data-creator="load-preview"]');await f.page.waitForSelector('#main video');
   await f.page.selectOption('#creator-channel','ch');await f.page.selectOption('#creator-preset','history');await f.page.click('[data-creator="preset"]');
