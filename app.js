@@ -856,7 +856,7 @@ function latestRender(p){
  if(!/^\/output\/[0-9a-f]{32}\/[a-z0-9-]{1,50}\.mp4$/.test(p.lastRender.url||''))return null;
  return p.lastRender;
 }
-function renderFingerprint(p){return JSON.stringify([p.kind||'',p.title||'',p.ytTitle||'',p.sourcePath||'',p.sourceUrl||'',Number(p.start||0),Number(p.duration),p.script||'',p.timedCaptions||'',p.voiceMode||'',p.audioPath||'',p.voiceName||'',p.hookText||'',p.captionX??50,p.captionY??75,p.channelId,p.captionStyle||'classic',p.cropFocus||'center',p.motion||'none',p.background||'midnight',p.visualMode||'classic',p.visualTheme||'aurora',p.visualTransition||'fade',JSON.stringify(p.visualScenes||[]),Number(p.sceneTimingReference||0)]);}
+function renderFingerprint(p){return JSON.stringify([p.kind||'',p.title||'',p.ytTitle||'',p.sourcePath||'',p.sourceUrl||'',Number(p.start||0),Number(p.duration),p.script||'',p.timedCaptions||'',p.voiceMode||'',p.audioPath||'',p.voiceName||'',p.hookText||'',p.captionX??50,p.captionY??75,p.channelId,p.captionStyle||'classic',p.cropFocus||'center',p.motion||'none',p.background||'midnight',p.visualMode||'classic',p.visualTheme||'aurora',p.visualTransition||'fade',JSON.stringify(p.visualScenes||[]),Number(p.sceneTimingReference||0),Number(p.creatorMediaRevision||0)]);}
 function exportRenderBatch(){
  const candidates=state.projects.filter(p=>['ready','scheduled'].includes(p.status));
  const good=candidates.filter(p=>renderBlockers(p).length===0);
@@ -1235,7 +1235,7 @@ function importTrends(file){if(!file)return;if(file.size>1024*1024){notice('Tren
   if(!count)throw Error('No valid entries');state.trends=state.trends.slice(-1000);save();render();notice(`Imported ${count} entries (${added} new).`);
  }catch(e){notice('Could not import. Choose a valid Viral Radar report.')}};reader.readAsText(file)}
 
-function navigate(next){page=next;location.hash=next;filter='all';render();$('.sidebar').classList.remove('show');window.scrollTo({top:0,behavior:'instant'});}
+function navigate(next){if(page==='creator'){try{window.DClipsCreator.flush();}catch(e){notice(e.message);return;}}page=next;location.hash=next;filter='all';render();$('.sidebar').classList.remove('show');window.scrollTo({top:0,behavior:'instant'});}
 function showModal(content){$('#modal-body').innerHTML=content;$('#modal').showModal()}
 function modalFrame(title,body,save='Save changes'){return `<form id="editor-form"><div class="modal-top"><h2>${esc(title)}</h2><button type="button" data-action="close-modal" aria-label="Close">×</button></div><div class="modal-body">${body}</div><div class="modal-footer"><button type="button" class="button button-ghost" data-action="close-modal">Cancel</button><button class="button button-primary" type="submit">${esc(save)}</button></div></form>`}
 function input(name,label,value='',placeholder='',type='text',extra=''){return `<div class="form-field"><label for="field-${name}">${label}</label><input class="field" id="field-${name}" name="${name}" value="${esc(value)}" placeholder="${esc(placeholder)}" type="${type}" ${extra}></div>`}
@@ -2179,8 +2179,9 @@ if(window.DClipsCreator){
   newProject:()=>{const id=uid();state.projects.push({id,title:'Untitled story',kind:'original',status:'draft',channelId:state.channels[0]?.id||'',createdAt:new Date().toISOString(),duration:30,script:'',visualMode:'illustrated',visualScenes:[],voiceMode:'kokoro',voiceName:'af_heart',captionStyle:'kinetic',rights:false});if(!save())throw Error('Could not save new project.');return id;},
   hydrate:async id=>{await restoreProjectMedia(id);},
   images:id=>cloudImagePacks.get(id)?.slots||[],
-  setImages:async(id,slots)=>{productionEditRevision++;const old=cloudImagePacks.get(id);const files=[...new Set([...(old?.files||[]),...slots.filter(Boolean)])];const next={files,slots,urls:old?.urls||new Map()};await mediaStore('put','images:'+id,{files,slots:slots.map(f=>files.indexOf(f))});for(const f of files)if(!next.urls.has(f))next.urls.set(f,URL.createObjectURL(f));cloudImagePacks.set(id,next);},
+  setImages:async(id,slots)=>{productionEditRevision++;const old=cloudImagePacks.get(id);const files=[...new Set([...(old?.files||[]),...slots.filter(Boolean)])];const next={files,slots,urls:old?.urls||new Map()};await mediaStore('put','images:'+id,{files,slots:slots.map(f=>files.indexOf(f))});for(const f of files)if(!next.urls.has(f))next.urls.set(f,URL.createObjectURL(f));cloudImagePacks.set(id,next);const p=state.projects.find(p=>p.id===id);if(p)p.creatorMediaRevision=(p.creatorMediaRevision||0)+1;if(!save())throw Error('Pictures saved but project state could not be saved. Export a backup.');},
   preview:id=>cloudFinishedPreviews.get(id)?.url||'',
+  previewStale:id=>{const item=cloudFinishedPreviews.get(id),p=state.projects.find(p=>p.id===id);return !!(item&&p&&item.fingerprint!==renderFingerprint(p));},
   job:p=>{if(captionsAreStale(p))throw Error('Refresh subtitle timing in the editor before rendering.');return createRenderJob(p);},
   editor:id=>{productionProjectId=id;page='production';location.hash='production';render();},
   video:async(id,file)=>{productionProjectId=id;await cloudReceiveVideo(file);},
