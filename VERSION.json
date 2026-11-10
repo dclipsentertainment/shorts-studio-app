@@ -1,6 +1,6 @@
 {
-  "version": "0.15.0",
+  "version": "0.16.0",
   "release_asset": "shorts-studio-app.zip",
   "released": "2026-11-10",
-  "notes": "Integrated story creator, continuity prompts, selective scene edits and speech reuse, complete browser media backups, production health checks"
+  "notes": "Private browser app, automatic video preview, channel defaults, pre-render review and reliable media dependencies"
 }

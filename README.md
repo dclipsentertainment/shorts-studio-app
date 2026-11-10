@@ -72,3 +72,14 @@ Download a **complete browser backup** (`.dclips`) to preserve the workspace, at
 **Production health** shows installed/latest versions, private connection status, tracked failures, browser storage and imported usage estimates. Remaining billable allowance and a deployed website's availability are not inferred. This release does not automatically provision hosting or publish videos.
 
 Upgrading from v0.14.17 or earlier: download and extract the v0.15.0 ZIP once. Those older updaters reject newly introduced root JavaScript files. Keep your existing browser origin and export a complete backup before moving installations. Subsequent releases use the expanded updater allowlist.
+
+
+## v0.16.0: online studio and fewer manual steps
+
+Open https://dclips-studio-online.diamand456.chatgpt.site for the private hosted dashboard. Existing browser storage belongs to its original address: download a complete .dclips backup there and restore it on the hosted app to move projects and attached media. The browser app needs no ZIP installation. Updates are deployed to this stable address.
+
+Story creator now supports History, General stories and ASMR defaults, saved per-channel voice/style/caption/platform settings, and a readiness review before upload. Factual claims need your review or a fiction confirmation; automated checks detect placeholders but cannot establish truth or rights. Actions minutes are shown as a broad planning estimate, not verified billing or a free-allowance guarantee.
+
+On the hosted app, successful story renders load their video artifact directly into preview while the page is open and connected to GitHub. A manual Load preview button retries expired connections. Tokens remain in tab memory and are passed transiently through the same-origin streaming proxy; they are never sent to the artifact storage redirect. Artifact expiry and 500 MiB limits are reported rather than hidden.
+
+Media setup uses signed Ubuntu packages, HTTPS, IPv4, bounded retries and an alternate official mirror. Dependency failure remains a hard failure; tests are never skipped to make CI appear green.

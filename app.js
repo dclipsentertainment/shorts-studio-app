@@ -5,7 +5,7 @@
 'use strict';
 const STORE_KEY = 'shorts_studio_state_v1';
 const RECOVERY_KEY = 'shorts_studio_recovery_v1';
-const APP_VERSION = '0.15.0';
+const APP_VERSION = '0.16.0';
 const views = {creator:'Story creator',health:'Production health',asmr:'Satisfying ASMR',quick:'Quick Create',overview:'Overview',channels:'Channels',production:'Production flow',series:'Story series planner',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',live:'Live stream monitor',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',usage:'GitHub usage',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
 const palettes = ['#8c7aff','#ef7ab6','#50bdc3','#e9a868','#5abb92','#6b95f1'];
 const initial = () => ({version:1,channels:[],projects:[],scoutReports:[],trends:[],discovery:null,streamers:[],viralThreshold:100000,createdAt:new Date().toISOString(),demo:false});
@@ -1447,8 +1447,8 @@ function cloudVideoPanel(current){
  <p class="tiny-muted">${esc(item.name)} · watch to the end to unlock revised episode controls.</p>`:'<p class="tiny-muted">No cloud-rendered MP4 selected yet.</p>'}
  </section>`;
 }
-async function cloudReceiveVideo(file){
- const p=productionProject();if(!p||!file)return;
+async function cloudReceiveVideo(file,projectId,submittedFingerprint){
+ const p=projectId?state.projects.find(p=>p.id===projectId):productionProject();if(!p||!file)return;
  try{
   const originalName=file.name;
   if(/\.zip$/i.test(file.name))file=await window.DClipsCloudPack.videoFromArtifactZip(file);
@@ -1456,11 +1456,11 @@ async function cloudReceiveVideo(file){
    throw Error('Choose a finished MP4 or GitHub artifact ZIP within the size limits.');
   const previous=cloudFinishedPreviews.get(p.id);
   if(previous)URL.revokeObjectURL(previous.url);
-  cloudFinishedPreviews.set(p.id,{url:URL.createObjectURL(file),name:originalName,fingerprint:renderFingerprint(p)});
+  cloudFinishedPreviews.set(p.id,{url:URL.createObjectURL(file),name:originalName,fingerprint:submittedFingerprint||renderFingerprint(p)});
   watchedSeriesRenderKey='';
-  try{await mediaStore('put','video:'+p.id,{file,name:originalName,fingerprint:renderFingerprint(p)});}catch(_){notice('Video opened but could not be saved for reload. Keep the original MP4.');return;}
-  render();notice('Finished online video ready for review. Watch it through to the end before revising.');
- }catch(e){notice('Could not open GitHub video artifact: '+e.message)}
+  try{await mediaStore('put','video:'+p.id,{file,name:originalName,fingerprint:submittedFingerprint||renderFingerprint(p)});}catch(_){notice('Video opened but could not be saved for reload. Keep the original MP4.');return;}
+  if(page!=='creator')render();notice('Finished online video ready for review. Watch it through to the end before revising.');
+ }catch(e){notice('Could not open GitHub video artifact: '+e.message);if(projectId)throw e;}
 }
 
 function cloudEpisodeImagePrompt(project){
@@ -2185,7 +2185,9 @@ if(window.DClipsCreator){
   previewStale:id=>{const item=cloudFinishedPreviews.get(id),p=state.projects.find(p=>p.id===id);return !!(item&&p&&item.fingerprint!==renderFingerprint(p));},
   job:p=>{if(captionsAreStale(p))throw Error('Refresh subtitle timing in the editor before rendering.');return createRenderJob(p);},
   editor:id=>{productionProjectId=id;page='production';location.hash='production';render();},
-  video:async(id,file)=>{productionProjectId=id;await cloudReceiveVideo(file);},
+  video:async(id,file,fingerprint)=>{await cloudReceiveVideo(file,id,fingerprint);},
+  fingerprint:renderFingerprint,
+  asmr:title=>{asmrTitle=title;page='asmr';location.hash='asmr';render();},
   backup:async()=>{const ids=new Set(state.projects.map(p=>p.id));const rows=(await recovery.read()).filter(([k])=>ids.has(k.slice(k.indexOf(':')+1)));const blob=await recovery.encode(validateWorkspace(state),rows);const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='dclips-workspace-'+new Date().toISOString().slice(0,10)+'.dclips';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000);notice('Backup downloaded. Keep it outside browser storage.');},
   restore:async file=>{if(!file)return;const next=await recovery.decode(file,validateWorkspace);if(!confirm('Replace this workspace and browser media with the backup? Download a current backup first.'))return;const old=state,oldRows=await recovery.read();if(localStorage.getItem(STORE_KEY)!==lastSavedWorkspace)throw Error('Another tab changed this workspace. Reload first.');await recovery.replace(next.assets);state=next.workspace;if(!save()){state=old;await recovery.replace(oldRows);throw Error('Restore could not be saved. Previous media restored.');}for(const item of cloudImagePacks.values())for(const url of item.urls.values())URL.revokeObjectURL(url);for(const item of cloudFinishedPreviews.values())URL.revokeObjectURL(item.url);cloudImagePacks.clear();cloudFinishedPreviews.clear();productionEditRevision++;for(const p of state.projects)await restoreProjectMedia(p.id);notice('Workspace and browser media restored.');}
  });

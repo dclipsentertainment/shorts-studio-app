@@ -60,14 +60,21 @@ const project={id:'p',title:'Original',kind:'original',status:'draft',channelId:
   await f.page.route('https://api.github.com/**',async r=>{
    const url=r.request().url();
    if(url.includes('/contents/')){const body=r.request().postDataJSON();assert(body.content.length>100);assert.equal(body.branch,'main');uploaded=true;return r.fulfill({json:{commit:{sha:'a'.repeat(40)}}});}
+   if(url.endsWith('/artifacts'))return r.fulfill({json:{artifacts:[{id:987,name:'finished-online-video',expired:false,size_in_bytes:1200}]}});
    if(url.includes('/actions/runs'))return r.fulfill({json:{workflow_runs:[{path:'.github/workflows/render-cloud-pack.yml',id:123,status:'completed',conclusion:'success'}]}});
    if(url.includes('/releases/latest'))return r.fulfill({json:{tag_name:'v0.15.0'}});
    return r.fulfill({json:{private:true,default_branch:'main'}});
   });
   await f.page.locator('details summary').click();await f.page.fill('#creator-token','test-token-never-persist');await f.page.click('[data-creator="connect"]');
-  await f.page.check('#creator-rights');await f.page.click('[data-creator="render"]');
+  await f.page.check('#creator-rights');await f.page.check('#creator-facts');await f.page.click('[data-creator="render"]');
   await f.page.waitForFunction(key=>JSON.parse(localStorage.getItem(key)).creatorJobs?.some(j=>j.status==='queued'),key);assert(uploaded);
   await f.page.click('[data-creator="refresh"]');await f.page.waitForFunction(()=>document.querySelector('#main').textContent.includes('success'));
+  const artifactBytes=await f.page.evaluate(()=>{const video=new Uint8Array(1100);video.set([102,116,121,112],4);return Array.from(window.DClipsCloudPack.zip([{name:'finished.mp4',bytes:video}]));});
+  await f.page.route('**/api/cloud-artifact?id=987',r=>r.fulfill({contentType:'application/zip',body:Buffer.from(artifactBytes)}));
+  await f.page.click('[data-creator="load-preview"]');await f.page.waitForSelector('#main video');
+  await f.page.selectOption('#creator-channel','ch');await f.page.selectOption('#creator-preset','history');await f.page.click('[data-creator="preset"]');
+  assert.equal(await f.page.inputValue('#creator-voice'),'bm_george');await f.page.click('[data-creator="save-preset"]');
+  await f.page.reload();await f.page.waitForSelector('#creator-voice');assert.equal(await f.page.inputValue('#creator-voice'),'bm_george');
   assert(!(await f.page.evaluate(()=>JSON.stringify(localStorage))).includes('test-token-never-persist'));
   await f.page.goto(base+'/#health');await f.page.click('[data-creator="health"]');
   await f.page.waitForFunction(()=>document.querySelector('#main').textContent.includes('latest release: v0.15.0'));
