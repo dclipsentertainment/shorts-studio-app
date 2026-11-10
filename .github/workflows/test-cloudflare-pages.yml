@@ -12,6 +12,7 @@ on:
       - scripts/test_story_series.js
       - github-usage.js
       - creator.js
+      - creator-support.js
       - recovery.js
       - scripts/test_creator.js
       - styles.css
@@ -38,7 +39,7 @@ jobs:
           node scripts/test_creator.js
       - name: Verify only intended public assets are shipped
         run: |
-          test "$(find dist-cloudflare -maxdepth 1 -type f | wc -l)" -eq 11
+          test "$(find dist-cloudflare -maxdepth 1 -type f | wc -l)" -eq 12
           test ! -e dist-cloudflare/scripts
           test ! -e dist-cloudflare/user-data
           test ! -e dist-cloudflare/reports

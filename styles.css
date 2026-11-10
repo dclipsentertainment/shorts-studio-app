@@ -181,3 +181,9 @@
 .asmr-concept-bubbles .asmr-shape{border-radius:50%;background:radial-gradient(circle at 32% 24%,#f1fbff 5%,#90e9fb 23%,#3792d3 75%);box-shadow:inset 0 -8px 19px #2c5caa,0 0 35px #91deff99}
 @keyframes asmr-pulse{0%,100%{transform:scale(1,1) rotate(-2deg)}50%{transform:scale(1.22,.76) rotate(1deg)}}
 @media(prefers-reduced-motion:reduce){.asmr-concept .asmr-shape{animation:none}}
+
+
+/* Keep creator review confirmations and source notes visually separate. */
+#main label:has([id^="creator-"]){display:block;margin:12px 0;line-height:1.5}
+#main label:has(#creator-rights),#main label:has(#creator-facts){display:flex;gap:9px;align-items:flex-start}
+#main #creator-rights,#main #creator-facts{flex:none;margin-top:4px}

@@ -1,0 +1,11 @@
+import assert from 'node:assert/strict';
+import {artifact} from '../web/artifact-proxy.mjs';
+const req=(path,headers={})=>new Request('https://studio.example'+path,{headers});
+assert.equal((await artifact(req('/api/cloud-artifact?id=abc'))).status,400);
+assert.equal((await artifact(req('/api/cloud-artifact?id=1'))).status,401);
+assert.equal((await artifact(req('/api/cloud-artifact?id=1',{'Origin':'https://evil.example','X-DClips-GitHub-Token':'secret'}))).status,403);
+let calls=[];
+const response=await artifact(req('/api/cloud-artifact?id=123',{'X-DClips-GitHub-Token':'test-only'}),async(url,options)=>{calls.push({url,options});if(calls.length===1)return new Response(null,{status:302,headers:{Location:'https://downloads.example/video.zip?signature=private'}});return new Response(new Uint8Array([80,75,3,4]));});
+assert.equal(response.status,200);assert.deepEqual([...new Uint8Array(await response.arrayBuffer())],[80,75,3,4]);assert.equal(calls[0].options.headers.Authorization,'Bearer test-only');assert.equal(calls[1].options.headers,undefined);assert.equal(calls[1].options.redirect,'error');assert.equal(response.headers.get('Cache-Control'),'no-store');
+const huge=await artifact(req('/api/cloud-artifact?id=123',{'X-DClips-GitHub-Token':'test-only'}),async(url)=>url.includes('api.github')?new Response(null,{status:302,headers:{Location:'https://downloads.example/x'}}):new Response('x',{headers:{'Content-Length':String(501*1024*1024)}}));assert.equal(huge.status,413);
+console.log('PASS: artifact proxy rejects cross-origin requests, bounds size, and never forwards GitHub credentials to storage.');

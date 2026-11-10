@@ -26,8 +26,7 @@ jobs:
       - name: Install image and video engine for offline tests
         run: |
           python -m pip install 'Pillow>=10,<13'
-          sudo timeout 120s apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update -qq || echo "Package index refresh unavailable; trying the runner index."
-          sudo timeout 180s apt-get -o Acquire::Retries=0 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y -qq ffmpeg espeak-ng fonts-dejavu-core
+          bash scripts/install_media_tools.sh ffmpeg espeak-ng fonts-dejavu-core
       - name: Test illustrated scenes and narrated intro
         run: |
           python -m compileall -q scripts
