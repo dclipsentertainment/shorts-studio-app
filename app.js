@@ -1376,6 +1376,7 @@ function mediaStore(action,key,value){
  });
 }
 async function persistCloudImages(id){
+ const p=state.projects.find(p=>p.id===id);if(p){p.creatorMediaRevision=(p.creatorMediaRevision||0)+1;save();}
  const item=cloudImagePacks.get(id);
  try{if(item)await mediaStore('put','images:'+id,{files:item.files,slots:item.slots.map(f=>item.files.indexOf(f))});
  else await mediaStore('delete','images:'+id);}
