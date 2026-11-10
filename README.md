@@ -70,3 +70,5 @@ Replace one picture without replacing the others, or open the subtitle editor af
 Download a **complete browser backup** (`.dclips`) to preserve the workspace, attached pictures, their assignments and imported finished videos. Restore validates project references and media checksums before replacing storage. Backups support up to 250 MiB of media. Files referenced only by filesystem paths are not included; back those up separately. Keep backups outside browser storage.
 
 **Production health** shows installed/latest versions, private connection status, tracked failures, browser storage and imported usage estimates. Remaining billable allowance and a deployed website's availability are not inferred. This release does not automatically provision hosting or publish videos.
+
+Upgrading from v0.14.17 or earlier: download and extract the v0.15.0 ZIP once. Those older updaters reject newly introduced root JavaScript files. Keep your existing browser origin and export a complete backup before moving installations. Subsequent releases use the expanded updater allowlist.
