@@ -16,12 +16,14 @@ mkdir -p "$cache_dir/partial"
 # HTTPS avoids runner-specific HTTP proxy stalls. Keep distro signature verification enabled.
 sudo python3 - <<'PY'
 from pathlib import Path
+import re
 paths=[Path('/etc/apt/sources.list'),*Path('/etc/apt').glob('*mirrors*.txt'),*Path('/etc/apt/sources.list.d').glob('*.sources'),*Path('/etc/apt/sources.list.d').glob('*.list')]
 for p in paths:
     if p.is_file():
         s=p.read_text()
-        for host in ['azure.archive.ubuntu.com','archive.ubuntu.com','security.ubuntu.com']:
-            s=s.replace('http://'+host,'https://'+host)
+        # Regional EC2 mirrors can be slow on cross-cloud runners.
+        s=re.sub(r'https?://(?:[a-zA-Z0-9-]+\.)*archive\.ubuntu\.com', 'https://archive.ubuntu.com', s)
+        s=s.replace('http://security.ubuntu.com','https://security.ubuntu.com')
         p.write_text(s)
 PY
 opts=(-o Acquire::ForceIPv4=true -o Acquire::Retries=1 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 -o "Dir::Cache::archives=$cache_dir" -o Binary::apt::APT::Keep-Downloaded-Packages=true)
@@ -36,7 +38,7 @@ for attempt in 1 2; do
   sudo python3 - <<'PY'
 from pathlib import Path
 for p in [Path('/etc/apt/sources.list'),*Path('/etc/apt').glob('*mirrors*.txt'),*Path('/etc/apt/sources.list.d').glob('*.sources'),*Path('/etc/apt/sources.list.d').glob('*.list')]:
-    if p.is_file():p.write_text(p.read_text().replace('https://azure.archive.ubuntu.com','https://archive.ubuntu.com'))
+    if p.is_file():p.write_text(p.read_text().replace('https://archive.ubuntu.com','https://azure.archive.ubuntu.com'))
 PY
 done
 echo 'Unable to install media dependencies from either official Ubuntu mirror.' >&2
