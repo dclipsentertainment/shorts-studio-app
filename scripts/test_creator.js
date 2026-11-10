@@ -1,0 +1,24 @@
+'use strict';
+const assert=require('node:assert/strict');
+if(!global.crypto)global.crypto=require('node:crypto').webcrypto;if(!global.File)global.File=require('node:buffer').File;
+const creator=require('../creator.js'),recovery=require('../recovery.js'),h=require('./audit_harness.cjs')();
+(async()=>{
+ const script='Dr. Smith opened the door. A red fox waited outside. The fox ran home.';
+ const scenes=creator.scenePlan('A fox',script);
+ assert.equal(scenes.length,4);assert.equal(scenes[1].beat_text,'Dr. Smith opened the door.');assert.equal(scenes[2].narration_start_word,5);
+ assert.equal(scenes.slice(1).map(s=>s.beat_text).join(' '),script);
+ assert.throws(()=>creator.scenePlan('Title','unfinished thought'));
+ const prompt=creator.prompts({title:'A fox',continuity:{characters:'red fox, blue scarf',style:'watercolour'},visualScenes:scenes});
+ assert.equal(prompt.split('red fox, blue scarf').length-1,4);assert(prompt.includes('The fox ran home.'));
+ const workspace={version:1,channels:[],projects:[{id:'p1',kind:'original',title:'Fox',status:'draft',script,visualScenes:scenes}]};
+ const original=new File([new Uint8Array([1,2,3,4,5])],'fox.png',{type:'image/png'});
+ const asset=[['images:p1',{files:[original],slots:[0,-1]}],['video:p1',{file:new File(['video'],'fox.mp4'),name:'fox.mp4',fingerprint:'render'}]];
+ const blob=await recovery.encode(workspace,asset),restored=await recovery.decode(blob,h.api.validateWorkspace);
+ assert.equal(restored.workspace.projects[0].script,script);assert.deepEqual([...new Uint8Array(await restored.assets[0][1].files[0].arrayBuffer())],[1,2,3,4,5]);assert.deepEqual(restored.assets[0][1].slots,[0,-1]);
+ const damaged=new Uint8Array(await blob.arrayBuffer());damaged[damaged.length-1]^=1;await assert.rejects(recovery.decode(new Blob([damaged]),h.api.validateWorkspace),/damaged/);
+ await assert.rejects(recovery.decode(new Blob([damaged.slice(0,20)]),h.api.validateWorkspace));
+ await assert.rejects(recovery.decode(await recovery.encode(workspace,[['images:unknown',asset[0][1]]]),h.api.validateWorkspace),/project/);
+ await assert.rejects(creator.request('/repos/attacker/project'),/destination/);
+ await assert.rejects(creator.upload({id:'p1'},new Uint8Array()),/Connect/);
+ console.log('PASS: complete scene boundaries, continuity prompts, media recovery and corrupt backup rejection');
+})().catch(e=>{console.error(e);process.exitCode=1;});

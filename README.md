@@ -57,3 +57,18 @@ We track platform-specific income independently because Ireland's monetisation e
 
 GitHub Actions checks JavaScript syntax, the public asset allowlist, the dashboard controls and release ZIP packaging. The local Windows updater was tested against a real GitHub release.
 
+
+
+## v0.15.0: connected story workflow
+
+The app's **Story creator** page combines a title, reviewed narration, continuity notes, scene pictures, online voice/rendering and finished-video preview. Script and artwork generation still use copied ChatGPT prompts and imported images; no paid generation API is implied. The optional GitHub connection holds a fine-grained token only in tab memory. Limit it to the private production repository with Contents read/write and Actions read. Uploading a reviewed pack starts the existing private render workflow. Download the completed Actions artifact and open it in the creator to preview.
+
+Each scene stores its complete narration beat and a shared character/style reference. Measured caption timing locates scene boundaries when matching succeeds; otherwise the existing narration-duration scaling remains the fallback. Images remain creator-reviewed illustrations, not authenticated historical photographs.
+
+Replace one picture without replacing the others, or open the subtitle editor after preview. The private workflow caches verified narration WAVs; unchanged speech can be reused after picture/caption/style edits. Narration text, voice, model or engine changes invalidate it. Cache availability is best effort and final video encoding still runs.
+
+Download a **complete browser backup** (`.dclips`) to preserve the workspace, attached pictures, their assignments and imported finished videos. Restore validates project references and media checksums before replacing storage. Backups support up to 250 MiB of media. Files referenced only by filesystem paths are not included; back those up separately. Keep backups outside browser storage.
+
+**Production health** shows installed/latest versions, private connection status, tracked failures, browser storage and imported usage estimates. Remaining billable allowance and a deployed website's availability are not inferred. This release does not automatically provision hosting or publish videos.
+
+Upgrading from v0.14.17 or earlier: download and extract the v0.15.0 ZIP once. Those older updaters reject newly introduced root JavaScript files. Keep your existing browser origin and export a complete backup before moving installations. Subsequent releases use the expanded updater allowlist.

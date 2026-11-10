@@ -39,6 +39,39 @@ const project={id:'p',title:'Original',kind:'original',status:'draft',channelId:
   assert.equal(await f.page.inputValue('#asmr-duration'),'24');
   await f.page.reload();assert.equal(await f.page.inputValue('#asmr-duration'),'24');assert.equal(await f.page.inputValue('#asmr-variation'),'6');
   assert.deepEqual(f.errors,[]);await f.context.close();
+  f=await setup({...project,visualMode:'illustrated'});
+  await f.page.goto(base+'/#creator');await f.page.waitForSelector('#creator-script');
+  await f.page.fill('#creator-script','The fox opened the door. A friend waited outside.');
+  await f.page.fill('#creator-characters','Red fox with a blue scarf');
+  await f.page.click('[data-creator="plan"]');
+  await f.page.setInputFiles('#creator-images',[{name:'01-cover.png',mimeType:'image/png',buffer:png},{name:'02-story.png',mimeType:'image/png',buffer:png},{name:'03-friend.png',mimeType:'image/png',buffer:png}]);
+  await f.page.waitForFunction(()=>document.querySelector('#main').textContent.includes('3/3 pictures assigned'));
+  await f.page.setInputFiles('[data-scene-file="1"]',{name:'02-replacement.png',mimeType:'image/png',buffer:png});
+  await f.page.waitForFunction(()=>document.querySelector('#main').textContent.includes('02-replacement.png'));
+  await f.page.reload();await f.page.waitForFunction(()=>document.querySelector('#main').textContent.includes('3/3 pictures assigned'));
+  assert.equal(await f.page.inputValue('#creator-characters'),'Red fox with a blue scarf');
+  const download=f.page.waitForEvent('download');await f.page.click('[data-creator="backup"]');const backup=await download;
+  await f.page.fill('#creator-title','Changed after backup');await f.page.click('[data-creator="save"]');
+  f.page.on('dialog',d=>d.accept());
+  await f.page.setInputFiles('#creator-restore',await backup.path());
+  await f.page.waitForFunction(()=>document.querySelector('#creator-title').value==='Original');
+  await f.page.waitForFunction(()=>document.querySelector('#main').textContent.includes('3/3 pictures assigned'));
+  let uploaded=false;
+  await f.page.route('https://api.github.com/**',async r=>{
+   const url=r.request().url();
+   if(url.includes('/contents/')){const body=r.request().postDataJSON();assert(body.content.length>100);assert.equal(body.branch,'main');uploaded=true;return r.fulfill({json:{commit:{sha:'a'.repeat(40)}}});}
+   if(url.includes('/actions/runs'))return r.fulfill({json:{workflow_runs:[{path:'.github/workflows/render-cloud-pack.yml',id:123,status:'completed',conclusion:'success'}]}});
+   if(url.includes('/releases/latest'))return r.fulfill({json:{tag_name:'v0.15.0'}});
+   return r.fulfill({json:{private:true,default_branch:'main'}});
+  });
+  await f.page.locator('details summary').click();await f.page.fill('#creator-token','test-token-never-persist');await f.page.click('[data-creator="connect"]');
+  await f.page.check('#creator-rights');await f.page.click('[data-creator="render"]');
+  await f.page.waitForFunction(key=>JSON.parse(localStorage.getItem(key)).creatorJobs?.some(j=>j.status==='queued'),key);assert(uploaded);
+  await f.page.click('[data-creator="refresh"]');await f.page.waitForFunction(()=>document.querySelector('#main').textContent.includes('success'));
+  assert(!(await f.page.evaluate(()=>JSON.stringify(localStorage))).includes('test-token-never-persist'));
+  await f.page.goto(base+'/#health');await f.page.click('[data-creator="health"]');
+  await f.page.waitForFunction(()=>document.querySelector('#main').textContent.includes('latest release: v0.15.0'));
+  assert.deepEqual(f.errors,[]);await f.context.close();
   console.log('PASS: real-browser render race, duration reconciliation, reload and persistent image assignment');
  }finally{if(browser)await browser.close();server.kill();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

@@ -6,7 +6,7 @@ $root = Split-Path -Parent $PSScriptRoot
 $repo = 'dclipsentertainment/shorts-studio-app'
 function Log([string]$s) { if (-not $Silent) { Write-Host $s } }
 function SafePath([string]$name) {
-    if ($name -in @('index.html','VERSION.json','styles.css','app.js','asmr.js','story-series.js','quick-create.js','cloud-pack.js','github-usage.js',
+    if ($name -in @('index.html','VERSION.json','styles.css','app.js','asmr.js','story-series.js','quick-create.js','cloud-pack.js','github-usage.js','creator.js','recovery.js',
         'OPEN-DASHBOARD.cmd','OPEN-PRODUCTION-STUDIO.cmd','CHECK-FOR-UPDATES.cmd',
         'SETUP-UPDATES.cmd','.gitignore','requirements-visuals.txt')) { return $true }
     if ($name -match '^README(?:-[a-zA-Z0-9_-]+)?\.md$') { return $true }
@@ -66,8 +66,10 @@ try {
                 [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destination)
             }
         } finally { $archive.Dispose() }
-        foreach ($essential in @('VERSION.json','index.html','styles.css','app.js','story-series.js','github-usage.js',
-            'OPEN-DASHBOARD.cmd','scripts/update.ps1','scripts/local_studio.py')) {
+        $required = @('VERSION.json','index.html','styles.css','app.js','story-series.js','github-usage.js',
+            'OPEN-DASHBOARD.cmd','scripts/update.ps1','scripts/local_studio.py')
+        if ($latest -ge [version]'0.15.0') { $required += @('creator.js','recovery.js','scripts/render_cache.py') }
+        foreach ($essential in $required) {
             if (-not $seen.ContainsKey($essential)) { throw "Update lacks required file: $essential" }
         }
         $packedVersion = [string](Get-Content -LiteralPath (Join-Path $staging 'VERSION.json') -Raw | ConvertFrom-Json).version
@@ -114,3 +116,4 @@ try {
     Write-Warning "DClips update not installed: $($_.Exception.Message). Opening the current version instead."
     exit 1
 }
+
