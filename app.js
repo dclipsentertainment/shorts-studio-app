@@ -1,12 +1,12 @@
 /* Shorts Studio — privacy-first, dependency-free planning dashboard.
- * No API credentials are stored or requested by this version.
+ * Optional GitHub credentials remain in the Creator module memory only.
  */
 (() => {
 'use strict';
 const STORE_KEY = 'shorts_studio_state_v1';
 const RECOVERY_KEY = 'shorts_studio_recovery_v1';
-const APP_VERSION = '0.14.17';
-const views = {asmr:'Satisfying ASMR',quick:'Quick Create',overview:'Overview',channels:'Channels',production:'Production flow',series:'Story series planner',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',live:'Live stream monitor',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',usage:'GitHub usage',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
+const APP_VERSION = '0.15.0';
+const views = {creator:'Story creator',health:'Production health',asmr:'Satisfying ASMR',quick:'Quick Create',overview:'Overview',channels:'Channels',production:'Production flow',series:'Story series planner',studio:'Content studio',queue:'Publishing queue',scout:'Clip scout',live:'Live stream monitor',radar:'Viral radar',discover:'Trend discovery',analytics:'Analytics',usage:'GitHub usage',growth:'Growth lab',creative:'Creative lab',quality:'Quality gate',competitors:'Competitors',ai:'ChatGPT script desk',preview:'Preview & subtitles',setup:'Setup & backups'};
 const palettes = ['#8c7aff','#ef7ab6','#50bdc3','#e9a868','#5abb92','#6b95f1'];
 const initial = () => ({version:1,channels:[],projects:[],scoutReports:[],trends:[],discovery:null,streamers:[],viralThreshold:100000,createdAt:new Date().toISOString(),demo:false});
 const $ = s => document.querySelector(s);
@@ -161,7 +161,7 @@ function render(){
  $('#today-date').textContent=new Date().toLocaleDateString('en-IE',{weekday:'short',day:'numeric',month:'short'});
  $('#crumb-current').textContent=views[page];
  document.querySelectorAll('[data-nav]').forEach(b=>b.classList.toggle('active',b.dataset.nav===page));
- const main=$('#main');main.innerHTML=({asmr:asmrPage,quick:quickPage,overview:overview,channels:channelsPage,production:productionPage,series:seriesPage,studio:studioPage,queue:queuePage,scout:scoutPage,live:liveMonitorPage,radar:radarPage,discover:discoverPage,analytics:analyticsPage,usage:window.DClipsUsageMonitor.render,growth:growthPage,creative:creativePage,ai:aiDeskPage,preview:previewPage,quality:qualityPage,competitors:competitorsPage,setup:setupPage}[page])();
+ const main=$('#main');main.innerHTML=({creator:()=>window.DClipsCreator.render(),health:()=>window.DClipsCreator.healthPage(),asmr:asmrPage,quick:quickPage,overview:overview,channels:channelsPage,production:productionPage,series:seriesPage,studio:studioPage,queue:queuePage,scout:scoutPage,live:liveMonitorPage,radar:radarPage,discover:discoverPage,analytics:analyticsPage,usage:window.DClipsUsageMonitor.render,growth:growthPage,creative:creativePage,ai:aiDeskPage,preview:previewPage,quality:qualityPage,competitors:competitorsPage,setup:setupPage}[page])();
  if(page==='usage')window.DClipsUsageMonitor.afterRender();
  if(page==='production')restoreProjectMedia(productionProjectId);
  if(page==='preview')previewRestoreDisplay();
@@ -1778,7 +1778,7 @@ function productionDraftSave(){
  if(p.timedCaptions&&!p.captionNarrationKey)p.captionNarrationKey=captionNarrationKey(p);
  const title=str($('#production-title')?.value).slice(0,150);
  const script=$('#production-script')?.value||'';
- if(p.script!==script)p.scenePlanText=[];
+ if(p.script!==script){p.scenePlanText=[];if(p.visualScenes?.some(s=>s.narration_start_word!=null)){p.creatorScenesStale=true;for(const scene of p.visualScenes){delete scene.narration_start_word;delete scene.narration_end_word;}}}
  const duration=Number($('#production-length')?.value);
  const start=Number($('#production-start')?.value);
  if(!title)throw Error('Enter a video title.');
@@ -1791,7 +1791,8 @@ function productionDraftSave(){
   const sceneLines=($('#production-scenes')?.value||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
   if(sceneLines.length>8)throw Error('Use 1–8 scene headlines.');
   const previousBeats=(p.visualScenes||[]).map(x=>[x.headline,x.start_seconds]).map(x=>JSON.stringify(x)).join('|');
-  p.visualScenes=sceneLines.map(line=>{const pos=line.indexOf(' | ');let headline=(pos<0?line:line.slice(0,pos)).trim();const image_path=pos<0?'':line.slice(pos+3).trim();let start_seconds=null;const match=headline.match(/^([0-9]+(?:\.[0-9]+)?)@(.+)$/);if(match){start_seconds=Number(match[1]);headline=match[2].trim();}if(!headline||headline.length>95)throw Error('Scene descriptions must be 1–95 characters.');if(image_path&&!/^(user-data\/media\/|assets\/)[A-Za-z0-9._/-]+\.(jpg|jpeg|png|webp)$/i.test(image_path))throw Error('Image paths must be project-relative JPG, PNG or WebP files.');return {headline,image_path,start_seconds};});
+  const oldScenes=p.visualScenes||[];
+  p.visualScenes=sceneLines.map((line,index)=>{const pos=line.indexOf(' | ');let headline=(pos<0?line:line.slice(0,pos)).trim();const image_path=pos<0?'':line.slice(pos+3).trim();let start_seconds=null;const match=headline.match(/^([0-9]+(?:\.[0-9]+)?)@(.+)$/);if(match){start_seconds=Number(match[1]);headline=match[2].trim();}if(!headline||headline.length>95)throw Error('Scene descriptions must be 1–95 characters.');if(image_path&&!/^(user-data\/media\/|assets\/)[A-Za-z0-9._/-]+\.(jpg|jpeg|png|webp)$/i.test(image_path))throw Error('Image paths must be project-relative JPG, PNG or WebP files.');return {...(oldScenes[index]?.headline===headline?oldScenes[index]:{}),headline,image_path,start_seconds};});
   const updatedBeats=p.visualScenes.map(x=>[x.headline,x.start_seconds]).map(x=>JSON.stringify(x)).join('|');
   if(previousBeats!==updatedBeats){p.sceneTimingReference=null;p.scenePlanText=[];}
   p.visualMode=$('#production-visual-mode')?.value||'illustrated';p.visualTheme=$('#production-visual-theme')?.value||'aurora';p.visualTransition=$('#production-visual-transition')?.value||'fade';
@@ -2171,6 +2172,23 @@ document.addEventListener('ended',ev=>{
 },true);
 document.addEventListener('loadedmetadata',ev=>{if(ev.target.id==='preview-video'){previewFileDuration=ev.target.duration; if(Number.isFinite(previewFileDuration)){let start=previewStart();if(start<previewFileDuration)ev.target.currentTime=start;} }},true);
 document.addEventListener('timeupdate',ev=>{if(ev.target.id==='production-video'){productionUpdateOverlay();const v=ev.target,limit=(Number($('#production-start')?.value)||0)+(Number($('#production-length')?.value)||30);if(v.currentTime>=limit)v.pause();}if(ev.target.id==='preview-video'){previewUpdateOverlay();let v=ev.target;if(v.currentTime>=previewStart()+previewDuration()&&v.currentTime>0)v.pause();}},true);
+
+if(window.DClipsCreator){
+ const recovery=window.DClipsRecovery;
+ window.DClipsCreator.connect({state:()=>state,save,render,notice,version:APP_VERSION,
+  newProject:()=>{const id=uid();state.projects.push({id,title:'Untitled story',kind:'original',status:'draft',channelId:state.channels[0]?.id||'',createdAt:new Date().toISOString(),duration:30,script:'',visualMode:'illustrated',visualScenes:[],voiceMode:'kokoro',voiceName:'af_heart',captionStyle:'kinetic',rights:false});if(!save())throw Error('Could not save new project.');return id;},
+  hydrate:async id=>{await restoreProjectMedia(id);},
+  images:id=>cloudImagePacks.get(id)?.slots||[],
+  setImages:async(id,slots)=>{productionEditRevision++;const old=cloudImagePacks.get(id);const files=[...new Set([...(old?.files||[]),...slots.filter(Boolean)])];const next={files,slots,urls:old?.urls||new Map()};await mediaStore('put','images:'+id,{files,slots:slots.map(f=>files.indexOf(f))});for(const f of files)if(!next.urls.has(f))next.urls.set(f,URL.createObjectURL(f));cloudImagePacks.set(id,next);},
+  preview:id=>cloudFinishedPreviews.get(id)?.url||'',
+  job:p=>{if(captionsAreStale(p))throw Error('Refresh subtitle timing in the editor before rendering.');return createRenderJob(p);},
+  editor:id=>{productionProjectId=id;page='production';location.hash='production';render();},
+  video:async(id,file)=>{productionProjectId=id;await cloudReceiveVideo(file);},
+  backup:async()=>{const ids=new Set(state.projects.map(p=>p.id));const rows=(await recovery.read()).filter(([k])=>ids.has(k.slice(k.indexOf(':')+1)));const blob=await recovery.encode(validateWorkspace(state),rows);const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='dclips-workspace-'+new Date().toISOString().slice(0,10)+'.dclips';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),10000);notice('Backup downloaded. Keep it outside browser storage.');},
+  restore:async file=>{if(!file)return;const next=await recovery.decode(file,validateWorkspace);if(!confirm('Replace this workspace and browser media with the backup? Download a current backup first.'))return;const old=state,oldRows=await recovery.read();if(localStorage.getItem(STORE_KEY)!==lastSavedWorkspace)throw Error('Another tab changed this workspace. Reload first.');await recovery.replace(next.assets);state=next.workspace;if(!save()){state=old;await recovery.replace(oldRows);throw Error('Restore could not be saved. Previous media restored.');}for(const item of cloudImagePacks.values())for(const url of item.urls.values())URL.revokeObjectURL(url);for(const item of cloudFinishedPreviews.values())URL.revokeObjectURL(item.url);cloudImagePacks.clear();cloudFinishedPreviews.clear();productionEditRevision++;for(const p of state.projects)await restoreProjectMedia(p.id);notice('Workspace and browser media restored.');}
+ });
+ window.DClipsCreator.events();
+}
 $('#mobile-menu').addEventListener('click',()=>$('.sidebar').classList.toggle('show'));
 window.addEventListener('hashchange',()=>{let next=location.hash.slice(1);if(next in views && next!==page){page=next;render()}});
 render();

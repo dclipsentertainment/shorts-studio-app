@@ -1,6 +1,6 @@
 {
-  "version": "0.14.17",
+  "version": "0.15.0",
   "release_asset": "shorts-studio-app.zip",
-  "released": "2026-10-30",
-  "notes": "Audit fixes, seamless ASMR loop transitions, editable duration and variation, verified voice downloads and release regression checks"
+  "released": "2026-11-10",
+  "notes": "Integrated story creator, continuity prompts, selective scene edits and speech reuse, complete browser media backups, production health checks"
 }

@@ -601,12 +601,15 @@ def render(job_path: Path, out_dir: Path) -> Path:
             voice=path_from_project(narration.get('audio_path') or '')
             if not any(s.get('codec_type')=='audio' for s in probe(voice).get('streams',[])):
                 raise JobError('Narration audio file contains no audio stream.')
-        if mode=='basic':
-            voice=voice_flite(script,tempdir/'voice.wav',tempdir)
-        if mode=='piper':
-            voice=voice_piper(script,tempdir/'neural-voice.wav',str(narration.get('voice') or 'en_GB-cori-high'))
-        if mode=='kokoro':
-            voice=voice_kokoro(script,tempdir/'kokoro-narration.wav',str(narration.get('voice') or 'af_heart'),float(narration.get('speed',0.96)))
+        if mode in ('basic','piper','kokoro'):
+            from render_cache import cached_voice, fingerprint
+            import os
+            def synthesize():
+                if mode=='basic':return voice_flite(script,tempdir/'voice.wav',tempdir)
+                if mode=='piper':return voice_piper(script,tempdir/'voice.wav',str(narration.get('voice') or 'en_GB-cori-high'))
+                return voice_kokoro(script,tempdir/'voice.wav',str(narration.get('voice') or 'af_heart'),float(narration.get('speed',0.96)))
+            key=fingerprint(script,narration,ROOT) if os.environ.get('DCLIPS_RENDER_CACHE') else ''
+            voice=cached_voice(key,tempdir/'voice.wav',synthesize)
         runtime=requested
         if kind=='original' and voice:
             actual_audio_duration=duration_of(voice)+intro_seconds+0.2
@@ -615,6 +618,11 @@ def render(job_path: Path, out_dir: Path) -> Path:
             runtime=max(requested,actual_audio_duration)
         if kind=='clip' and source_length:
             runtime=min(runtime,source_length-start)
+        generated_timed=[]
+        if mode in ('kokoro','piper') and voice and narration.get('sync_captions',True) and not data.get('caption_segments') and ((bool(data.get('captions',True)) and caption_style!='none') or any('narration_start_word' in s for s in (data.get('visuals') or {}).get('scenes',[]))):
+            generated_timed=align_voice_captions(voice,script,max(1,runtime-intro_seconds))
+            if image_story:
+                generated_timed=[{**cue,'start_seconds':round(cue['start_seconds']+intro_seconds,3),'end_seconds':round(cue['end_seconds']+intro_seconds,3)} for cue in generated_timed]
         if procedural and visual_mode in ('storyboard','illustrated'):
             try:
                 # Speech is generated before drawing scenes. Scale script-based
@@ -628,6 +636,10 @@ def render(job_path: Path, out_dir: Path) -> Path:
                     actual_spoken=duration_of(voice) if voice else runtime-intro_seconds
                     data['visuals']['scenes']=retime_to_recorded_narration(
                         data['visuals'].get('scenes') or [],reference,actual_spoken)
+                if visual_mode=='illustrated' and generated_timed:
+                    from render_cache import align_scenes
+                    measured=align_scenes(data['visuals'].get('scenes') or [],script,generated_timed,intro_seconds)
+                    if measured:data['visuals']['scenes']=measured
                 from storyboard import create_story_video
                 video=create_story_video(data,runtime,tempdir/'story-scenes')
             except (ImportError,ValueError,OSError) as exc:
@@ -643,12 +655,7 @@ def render(job_path: Path, out_dir: Path) -> Path:
             subtitle_title='' if image_story else title
             if (mode in ('kokoro','piper') and voice and
                     narration.get('sync_captions', True) and not timed):
-                timed = align_voice_captions(voice, script, max(1,runtime-intro_seconds))
-                if image_story:
-                    timed=[{**cue,
-                            'start_seconds':round(cue['start_seconds']+intro_seconds,3),
-                            'end_seconds':round(cue['end_seconds']+intro_seconds,3)}
-                           for cue in timed]
+                timed = generated_timed
                 print(f'Speech-aligned captions from generated audio: {len(timed)} cues.')
 
             if caption_style=='hook':

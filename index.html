@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#0a0f1d">
-  <title>DClips Studio v0.14.16 · Multi-platform content command center</title>
+  <title>DClips Studio v0.15.0 · Multi-platform content command center</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -16,6 +16,8 @@
       <div class="side-label">WORKSPACE</div>
       <nav class="nav" aria-label="Main navigation">
         <button data-nav="asmr" class="nav-link"><span class="nav-symbol">◉</span> Satisfying ASMR</button>
+        <button data-nav="creator" class="nav-link"><span class="nav-symbol">▶</span> Story creator</button>
+        <button data-nav="health" class="nav-link"><span class="nav-symbol">✓</span> Production health</button>
         <button data-nav="quick" class="nav-link"><span class="nav-symbol">✦</span> Quick Create</button>
         <button data-nav="overview" class="nav-link active"><span class="nav-symbol">◫</span> Overview</button>
         <button data-nav="channels" class="nav-link"><span class="nav-symbol">▤</span> Channels <span class="nav-count" id="nav-channel-count">0</span></button>
@@ -40,7 +42,7 @@
       <nav class="nav"><button data-nav="setup" class="nav-link"><span class="nav-symbol">⚙</span> Setup & backups</button></nav>
       <div class="sidebar-bottom">
         <div class="online-indicator"><span class="led"></span> Local workspace <span class="free-label">FREE</span></div>
-        <p>v0.14.16 · Your data stays in this browser. Export backups regularly.</p>
+        <p>v0.15.0 · Your data stays in this browser. Export backups regularly.</p>
       </div>
     </aside>
     <div class="workspace">
@@ -58,6 +60,9 @@
   <script src="quick-create.js" defer></script>
   <script src="cloud-pack.js" defer></script>
   <script src="github-usage.js" defer></script>
+  <script src="recovery.js" defer></script>
+  <script src="creator.js" defer></script>
   <script src="app.js" defer></script>
 </body>
 </html>
+
