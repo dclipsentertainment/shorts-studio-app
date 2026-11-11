@@ -93,8 +93,8 @@ def retime_to_recorded_narration(scenes, reference_seconds, recorded_seconds):
         actual = float(recorded_seconds)
     except (ValueError, TypeError):
         raise ValueError('Invalid scene timing reference.')
-    if not (math.isfinite(reference) and math.isfinite(actual) and reference >= 5 and actual >= 5):
-        raise ValueError('Narration timing must be finite and at least five seconds.')
+    if not (math.isfinite(reference) and math.isfinite(actual) and reference >= 5 and actual > 0):
+        raise ValueError('Scene timing reference must be at least five seconds; recorded narration must have positive finite duration.')
     if not isinstance(scenes, list) or not 2 <= len(scenes) <= MAX_SCENES:
         raise ValueError('No story scenes to retime.')
     result = []
